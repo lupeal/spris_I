@@ -1,0 +1,97 @@
+---
+title: "Longitudinal Analysis"
+output: pdf_document
+author: "Liner Ge"
+date: "2025-02-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+library(table1)
+library(corrplot)
+```
+
+## Scientific Question
+
+### Primary objective
+
+- Determine whether the effect of low dose DAR-0100A and high dose DAR-0100A on improving memory as measured by the composite memory score are significantly higher than the effect of placebo at day 5, day 19, and day 90.
+
+- Determine whether the treatment effects differ over time within placebo group, low dose group and high dose group.
+
+- Determine whether the trajectory of treatment effects over time differ between placebo group, low dose group and high dose group.
+
+### Sensitivity analysis
+
+## EDA
+
+### Table 1
+
+```{r}
+data = read.csv("./data.csv") %>% 
+  mutate(day =case_when(day == 0 ~ "Day 0",
+                        day == 5 ~ "Day 5",
+                        day == 19 ~ "Day 19",
+                        day == 90 ~ "Day 90"
+                        ))
+
+data_table1= data%>% 
+  group_by(Subject_ID) %>% 
+  filter(day == "Day 0")
+
+table1(~ Age + factor(Gender) | Treatment_Group, data=data_table1)
+```
+
+### Spaghetti plot
+
+```{r}
+ggplot(data, aes(x=day, y = MEM_comp, group = Subject_ID))+
+  geom_line()+ 
+    stat_summary(aes(group = 1), geom = "point", fun.y = mean,
+    shape = 16, size = 2, color = "red")+
+  facet_grid(. ~ Treatment_Group)+
+   labs(title="Change of composite memory score over time by treatment group",
+       x="Time points", 
+       y = "Composite memory score")+
+  theme_light()
+```
+
+
+### Boxplot for displaying the composite memory score by group at different time points
+
+```{r}
+ggplot(data)+
+  geom_boxplot(aes(x=day, y = MEM_comp, fill = Treatment_Group))+ 
+  labs(title="Plot of composite memory score by treatment group at different time points",
+       x="Time points", 
+       y = "Composite memory score")+
+  scale_fill_discrete(name = "Treatment group",
+                      labels=c("A: Placebo","B: Low dose DAR-0100A","C: High dose DAR-0100A"))+
+  theme_classic()
+```
+
+### Correlation matrix
+
+```{r}
+cor_data = data %>% 
+  pivot_wider( names_from = day,
+              values_from = MEM_comp) %>% 
+  mutate(
+    Age = as.numeric(Age),
+    Gender = case_when(Gender == "M" ~ 1,
+                            Gender == "F" ~ 0,
+                            ),
+         Treatment_Group =case_when(Treatment_Group=="A" ~ 0,
+                                    Treatment_Group=="B" ~ 1,
+                                    Treatment_Group=="C" ~ 2,)
+         ) %>% 
+  select(-Subject_ID)
+
+corrplot(cor(cor_data, use='complete.obs'), addCoef.col = "red", type = "upper",tl.col="black", tl.srt=20)
+```
+
+
+

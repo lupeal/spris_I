@@ -18,9 +18,9 @@ library(corpcor)
 
 
 ## loading & cleaning data
-```{r}
+```{r,message=FALSE}
 #loading data
-data <- read_csv("Project 1 - Longitudinal/data.csv")
+data <- read_csv("data.csv")
 
 dat <- data %>%
   mutate(day = as.factor(day),
@@ -94,16 +94,23 @@ corrplot(cor(cor_rec), method = 'circle', type = 'full')
 ```
 
 
-
+## qq-plot for response
 ```{r, message=FALSE}
-library(GGally)
-dat %>%
-  select(-Subject_ID, -MEM_comp) %>%
-  ggpairs(upper = list(continuous = GGally::wrap('cor', family = 'sans')))
+qqnorm(dat$MEM_comp)
+qqline(dat$MEM_comp, col = 'steelblue')
+```
+
+#histogram for response
+```{r}
+ggplot(data = dat, aes(x = MEM_comp)) +
+  geom_histogram()
 ```
 
 
-
+```{r}
+ggplot(data = dat, aes(x = sqrt(MEM_comp))) +
+  geom_histogram(bins = 25)
+```
 
 
 
