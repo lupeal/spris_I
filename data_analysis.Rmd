@@ -8,13 +8,107 @@ output: html_document
 ```{r setup, include=FALS, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(gtsummary)
+library(corrplot)
+library(tidymodels)
+library(gridExtra)
+library(GGally)
+library(corpcor)
 ```
 
 
-## reading data
+## loading & cleaning data
 ```{r}
+#loading data
 data <- read_csv("Project 1 - Longitudinal/data.csv")
+
+dat <- data %>%
+  mutate(day = as.factor(day),
+         Gender = as.factor(Gender),
+         Treatment_Group = as.factor(Treatment_Group),
+         )
+  
 ```
+
+
+## notes:
+
+non-monotone missingness
+
+missing at random?
+
+GEE vs LMM vs GLM
+
+marginal vs individual effect over time
+
+binary vs continuous
+
+(potentially want to verify if it is missing at random? using the if at least one of their time points is missing, then we can see that most of those if not all are the ones with greater memory score overall)
+
+
+## eda
+
+```{r}
+head(dat)
+```
+
+
+## summary stats tbl using `gtsummary` 
+```{r, table 1}
+dat %>%
+  select(-Subject_ID) %>%
+  mutate(
+    Gender = case_when(Gender == 'M' ~ 'Male',
+                       Gender == 'F' ~ 'Female'),
+    
+    Treatment_Group = case_when(Treatment_Group == 'A' ~ 'Placebo',
+                                Treatment_Group == 'B' ~ 'Low dose',
+                                Treatment_Group == 'C' ~ 'High dose'))%>%
+    
+   # day = case_when(day == '0' ~ 'Day 0',
+   #                 day == '5' ~ 'Day 5',
+   #                 day == '19' ~ 'Day 19',
+   #                 day == '90' ~ 'Day 90')) %>%
+  tbl_summary(by = Treatment_Group,
+              statistic = list(all_continuous() ~ '{mean}({sd})',
+                               all_categorical() ~ '{n} ({p}%)'),
+              digits = all_continuous() ~ 3,
+              label = list(day ~ 'Day')) %>%
+  modify_spanning_header(c('stat_1', 'stat_2', 'stat_3') ~ '**Treatment Group**') %>%
+  modify_header(label = '**Variable**') %>%
+  bold_labels() %>%
+  modify_caption('Table 1. Summary statistics')
+
+#or patient characteristics
+```
+
+
+## correlation plots
+```{r}
+#converting covariates to numeric
+cor_rec <- model.matrix(MEM_comp ~ ., data = dat[,2:6])
+
+#adding back into matrix
+cor_rec[, 1] = dat$MEM_comp
+
+#plot
+corrplot(cor(cor_rec), method = 'circle', type = 'full')
+```
+
+
+
+```{r, message=FALSE}
+library(GGally)
+dat %>%
+  select(-Subject_ID, -MEM_comp) %>%
+  ggpairs(upper = list(continuous = GGally::wrap('cor', family = 'sans')))
+```
+
+
+
+
+
+
 
 
 
