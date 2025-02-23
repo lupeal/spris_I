@@ -1,0 +1,21 @@
+---
+title: "Project 1 - Longitudinal"
+author: "Lupe Antonio"
+date: "2025-02-23"
+output: html_document
+---
+
+```{r setup, include=FALS, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
+## reading data
+```{r}
+data <- read_csv("Project 1 - Longitudinal/data.csv")
+```
+
+
+
+
