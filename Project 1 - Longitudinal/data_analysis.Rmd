@@ -25,9 +25,7 @@ data <- read_csv("Project 1 - Longitudinal/data.csv")
 dat <- data %>%
   mutate(day = as.factor(day),
          Gender = as.factor(Gender),
-         Treatment_Group = as.factor(Treatment_Group),
-         )
-  
+         Treatment_Group = as.factor(Treatment_Group))
 ```
 
 
