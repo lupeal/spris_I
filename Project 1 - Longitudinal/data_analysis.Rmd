@@ -13,14 +13,13 @@ library(corrplot)
 library(tidymodels)
 library(gridExtra)
 library(GGally)
-library(corpcor)
 ```
 
 
 ## loading & cleaning data
 ```{r,message=FALSE}
 #loading data
-data <- read_csv("data.csv")
+data <- read_csv("Project 1 - Longitudinal/data.csv")
 
 dat <- data %>%
   mutate(day = as.factor(day),
@@ -63,7 +62,9 @@ gender_sum <- dat %>%
 
 trt_day <- dat %>%
   group_by(Treatment_Group, day) %>%
-  summarise(unique_subjects = n_distinct(Subject_ID), .groups = 'drop')
+  summarise(unique_subjects = n_distinct(Subject_ID),
+            N = n())
+
 
 #using unique subjects, finding the stats
 unique_sum <- dat %>%
@@ -123,32 +124,98 @@ sum_tble %>%
                              stat_3 = ifelse(variable == 'Age', paste(round(unique_sum$avg_age[1], 3),
                                                                       '(', unique_sum$age_range[1], ')'),
                                              stat_3),
+                             
                              #editing Gender = F vals
                              stat_1 = ifelse(variable == 'Gender' & label == 'Female',
                                              paste(unique_sum$female_ct[3], '(',
-                                                   round((unique_sum$female_ct/unique_sum$N[3])*100, 2), '%)'),
+                                                   round((unique_sum$female_ct[3]/unique_sum$N[3])*100, 2), '%)'),
                                              stat_1),
                              stat_2 = ifelse(variable == 'Gender' & label == 'Female',
                                              paste(unique_sum$female_ct[2], '(',
-                                                   round((unique_sum$female_ct/unique_sum$N[2])*100, 2), '%)'),
+                                                   round((unique_sum$female_ct[2]/unique_sum$N[2])*100, 2), '%)'),
                                              stat_2),
                              stat_3 = ifelse(variable == 'Gender' & label == 'Female',
                                              paste(unique_sum$female_ct[1], '(',
-                                                   round((unique_sum$female_ct/unique_sum$N[1])*100, 2), '%)'),
-                                             stat_2),
+                                                   round((unique_sum$female_ct[1]/unique_sum$N[1])*100, 2), '%)'),
+                                             stat_3),
                              #editing Gender = M vals
                              stat_1 = ifelse(variable == 'Gender' & label == 'Male',
                                              paste(unique_sum$male_ct[3], '(',
-                                                   round((unique_sum$male_ct/unique_sum$N[3])*100, 2), '%)'),
+                                                   round((unique_sum$male_ct[3]/unique_sum$N[3])*100, 2), '%)'),
                                              stat_1),
                              stat_2 = ifelse(variable == 'Gender' & label == 'Male',
                                              paste(unique_sum$male_ct[2], '(',
-                                                   round((unique_sum$male_ct/unique_sum$N[2])*100, 2), '%)'),
+                                                   round((unique_sum$male_ct[2]/unique_sum$N[2])*100, 2), '%)'),
                                              stat_2),
                              stat_3 = ifelse(variable == 'Gender' & label == 'Male',
                                              paste(unique_sum$male_ct[1], '(',
-                                                   round((unique_sum$male_ct/unique_sum$N[1])*100, 2), '%)'),
-                                             stat_2)))
+                                                   round((unique_sum$male_ct[1]/unique_sum$N[1])*100, 2), '%)'),
+                                             stat_3),
+                             #editing Day vals bc percentages:
+                             #day 0
+                             stat_1 = ifelse(variable == 'day' & label == '0',
+                                             paste(trt_day$unique_subjects[9], '(',
+                                                   round((trt_day$unique_subjects[9]/trt_day$N[9])*100,
+                                                         2), '%)'),
+                                             stat_1),
+                             stat_2 = ifelse(variable == 'day' & label == '0',
+                                             paste(trt_day$unique_subjects[5], '(',
+                                                   round((trt_day$unique_subjects[5]/trt_day$N[5])*100,
+                                                         2), '%)'),
+                                             stat_2),
+                             stat_3 = ifelse(variable == 'day' & label == '0',
+                                             paste(trt_day$unique_subjects[1], '(',
+                                                   round((trt_day$unique_subjects[1]/trt_day$N[1])*100,
+                                                         2), '%)'),
+                                             stat_3),
+                             #day 5
+                             stat_1 = ifelse(variable == 'day' & label == '5',
+                                             paste(trt_day$unique_subjects[10], '(',
+                                                   round((trt_day$unique_subjects[10]/trt_day$N[9])*100,
+                                                         2), '%)'),
+                                             stat_1),
+                             stat_2 = ifelse(variable == 'day' & label == '5',
+                                             paste(trt_day$unique_subjects[6], '(',
+                                                   round((trt_day$unique_subjects[6]/trt_day$N[5])*100,
+                                                         2), '%)'),
+                                             stat_2),
+                             stat_3 = ifelse(variable == 'day' & label == '5',
+                                             paste(trt_day$unique_subjects[2], '(',
+                                                   round((trt_day$unique_subjects[2]/trt_day$N[1])*100,
+                                                         2), '%)'),
+                                             stat_3),
+                             #day 19
+                             stat_1 = ifelse(variable == 'day' & label == '19',
+                                             paste(trt_day$unique_subjects[11], '(',
+                                                   round((trt_day$unique_subjects[11]/trt_day$N[9])*100,
+                                                         2), '%)'),
+                                             stat_1),
+                             stat_2 = ifelse(variable == 'day' & label == '19',
+                                             paste(trt_day$unique_subjects[7], '(',
+                                                   round((trt_day$unique_subjects[7]/trt_day$N[5])*100,
+                                                         2), '%)'),
+                                             stat_2),
+                             stat_3 = ifelse(variable == 'day' & label == '19',
+                                             paste(trt_day$unique_subjects[3], '(',
+                                                   round((trt_day$unique_subjects[3]/trt_day$N[1])*100,
+                                                         2), '%)'),
+                                             stat_3),
+                             #day 90
+                             stat_1 = ifelse(variable == 'day' & label == '90',
+                                             paste(trt_day$unique_subjects[12], '(',
+                                                   round((trt_day$unique_subjects[12]/trt_day$N[9])*100,
+                                                         2), '%)'),
+                                             stat_1),
+                             stat_2 = ifelse(variable == 'day' & label == '90',
+                                             paste(trt_day$unique_subjects[8], '(',
+                                                   round((trt_day$unique_subjects[8]/trt_day$N[5])*100,
+                                                         2), '%)'),
+                                             stat_2),
+                             stat_3 = ifelse(variable == 'day' & label == '90',
+                                             paste(trt_day$unique_subjects[4], '(',
+                                                   round((trt_day$unique_subjects[4]/trt_day$N[1])*100,
+                                                         2), '%)'),
+                                             stat_3)))
 ```
 
 
