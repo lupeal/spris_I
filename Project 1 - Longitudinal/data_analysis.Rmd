@@ -52,7 +52,134 @@ head(dat)
 
 
 ## summary stats tbl using `gtsummary` 
+```{r}
+grp_sum <- dat %>%
+  group_by(Treatment_Group) %>%
+  summarise(unique_subjects = n_distinct(Subject_ID))
+
+gender_sum <- dat %>%
+  group_by(Gender) %>%
+  summarise(unique_subjects = n_distinct(Subject_ID))
+
+trt_day <- dat %>%
+  group_by(Treatment_Group, day) %>%
+  summarise(unique_subjects = n_distinct(Subject_ID), .groups = 'drop')
+
+#using unique subjects, finding the stats
+unique_sum <- dat %>%
+  distinct(Subject_ID, Age, Gender, Treatment_Group) %>%
+  group_by(Treatment_Group) %>%
+  summarise(avg_age = mean(Age),
+            age_range = paste(min(Age),',',max(Age)),
+            female_ct = sum(Gender == 'F'),
+            male_ct = sum(Gender == 'M'),
+            N = n())
+```
+
 ```{r, table 1}
+sum_tble <- dat %>%
+  select(-Subject_ID, -MEM_comp) %>%
+  mutate(
+    Gender = case_when(Gender == 'M' ~ 'Male',
+                       Gender == 'F' ~ 'Female'),
+    
+    Treatment_Group = case_when(Treatment_Group == 'A' ~ 'Placebo',
+                                Treatment_Group == 'B' ~ 'Low dose',
+                                Treatment_Group == 'C' ~ 'High dose')) %>%
+    
+   # day = case_when(day == '0' ~ 'Day 0',
+   #                 day == '5' ~ 'Day 5',
+   #                 day == '19' ~ 'Day 19',
+   #                 day == '90' ~ 'Day 90')) %>%
+  
+  tbl_summary(by = Treatment_Group,
+              statistic = list(all_continuous() ~ '{mean}({min}, {max})',
+                               all_categorical() ~ '{n} ({p}%)'),
+              digits = all_continuous() ~ 3,
+              label = list(day ~ 'Day')) %>%
+  modify_spanning_header(c('stat_1', 'stat_2', 'stat_3') ~ '**Treatment Group**') %>%
+  modify_header(label = '**Variable**',
+                stat_1 = paste('**High dose**, N = ', grp_sum$unique_subjects[3]),
+                stat_2 = paste('**Low dose**, N = ', grp_sum$unique_subjects[2]),
+                stat_3 = paste('**Placebo**, N = ', grp_sum$unique_subjects[1])) %>%
+  bold_labels() %>%
+  modify_caption('Table 1. Summary statistics')
+
+#or patient characteristics
+```
+
+
+#modifying table vals
+```{r}
+sum_tble %>%
+    modify_table_body(~ .x %>%
+                      #editing Age vals
+                      mutate(stat_1 = ifelse(variable == 'Age', paste(unique_sum$avg_age[3],
+                                                                      '(', unique_sum$age_range[3], ')'),
+                                             stat_1),
+                             stat_2 = ifelse(variable == 'Age', paste(round(unique_sum$avg_age[2], 3),
+                                                                      '(', unique_sum$age_range[2], ')'),
+                                             stat_2),
+                             stat_3 = ifelse(variable == 'Age', paste(round(unique_sum$avg_age[1], 3),
+                                                                      '(', unique_sum$age_range[1], ')'),
+                                             stat_3),
+                             #editing Gender = F vals
+                             stat_1 = ifelse(variable == 'Gender' & label == 'Female',
+                                             paste(unique_sum$female_ct[3], '(',
+                                                   round((unique_sum$female_ct/unique_sum$N[3])*100, 2), '%)'),
+                                             stat_1),
+                             stat_2 = ifelse(variable == 'Gender' & label == 'Female',
+                                             paste(unique_sum$female_ct[2], '(',
+                                                   round((unique_sum$female_ct/unique_sum$N[2])*100, 2), '%)'),
+                                             stat_2),
+                             stat_3 = ifelse(variable == 'Gender' & label == 'Female',
+                                             paste(unique_sum$female_ct[1], '(',
+                                                   round((unique_sum$female_ct/unique_sum$N[1])*100, 2), '%)'),
+                                             stat_2),
+                             #editing Gender = M vals
+                             stat_1 = ifelse(variable == 'Gender' & label == 'Male',
+                                             paste(unique_sum$male_ct[3], '(',
+                                                   round((unique_sum$male_ct/unique_sum$N[3])*100, 2), '%)'),
+                                             stat_1),
+                             stat_2 = ifelse(variable == 'Gender' & label == 'Male',
+                                             paste(unique_sum$male_ct[2], '(',
+                                                   round((unique_sum$male_ct/unique_sum$N[2])*100, 2), '%)'),
+                                             stat_2),
+                             stat_3 = ifelse(variable == 'Gender' & label == 'Male',
+                                             paste(unique_sum$male_ct[1], '(',
+                                                   round((unique_sum$male_ct/unique_sum$N[1])*100, 2), '%)'),
+                                             stat_2)))
+```
+
+
+```{r}
+dat %>%
+  group_by(Treatment_Group, day) %>%
+  summarise(subj_ct = n_distinct(Subject_ID))
+```
+
+
+
+
+```{r}
+dat %>%
+  filter(Treatment_Group == 'A') %>%
+  unique()
+
+
+#using unique subjects, finding the stats
+dat %>%
+  distinct(Subject_ID, Age, Gender, Treatment_Group) %>%
+  group_by(Treatment_Group) %>%
+  summarise(avg_age = mean(Age),
+            age_range = paste(min(Age),',',max(Age)),
+            female_ct = sum(Gender == 'F'),
+            male_ct = sum(Gender == 'M'))
+```
+
+
+##table or plot for showcasing memory scores for each trt grp by day. 
+```{r}
 dat %>%
   select(-Subject_ID) %>%
   mutate(
@@ -61,24 +188,18 @@ dat %>%
     
     Treatment_Group = case_when(Treatment_Group == 'A' ~ 'Placebo',
                                 Treatment_Group == 'B' ~ 'Low dose',
-                                Treatment_Group == 'C' ~ 'High dose'))%>%
-    
-   # day = case_when(day == '0' ~ 'Day 0',
-   #                 day == '5' ~ 'Day 5',
-   #                 day == '19' ~ 'Day 19',
-   #                 day == '90' ~ 'Day 90')) %>%
-  tbl_summary(by = Treatment_Group,
+                                Treatment_Group == 'C' ~ 'High dose')) %>%
+  tbl_summary(by = day,
               statistic = list(all_continuous() ~ '{mean}({sd})',
                                all_categorical() ~ '{n} ({p}%)'),
               digits = all_continuous() ~ 3,
               label = list(day ~ 'Day')) %>%
-  modify_spanning_header(c('stat_1', 'stat_2', 'stat_3') ~ '**Treatment Group**') %>%
+  modify_spanning_header(c('stat_1', 'stat_2', 'stat_3') ~ '**Day**') %>%
   modify_header(label = '**Variable**') %>%
   bold_labels() %>%
   modify_caption('Table 1. Summary statistics')
-
-#or patient characteristics
 ```
+
 
 
 ## correlation plots
@@ -100,13 +221,14 @@ qqnorm(dat$MEM_comp)
 qqline(dat$MEM_comp, col = 'steelblue')
 ```
 
-#histogram for response
+
+## histogram for response
 ```{r}
 ggplot(data = dat, aes(x = MEM_comp)) +
   geom_histogram()
 ```
 
-
+## with sqrt transformation
 ```{r}
 ggplot(data = dat, aes(x = sqrt(MEM_comp))) +
   geom_histogram(bins = 25)
