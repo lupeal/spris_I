@@ -425,6 +425,9 @@ summary(mod3)
 ^ original model (random intercept model? def mixed effects)
 
 
+
+
+
 ## model with only complete cases:
 
 there are 47 total unique subjects, so complete_days should have 188 possible combos.
@@ -463,9 +466,18 @@ complete_data <- dat %>%
   filter(Subject_ID %in% complete_subj) #should be only 96 entries (24*4)
 ```
 
-```{r}
 
+```{r, model w complete data}
+complete_mod <- lme(MEM_comp ~ day + Age + Gender + Treatment_Group + day*Treatment_Group,
+                    random = ~ 1 | Subject_ID,
+                    data = dat, method = 'REML', correlation = corSymm())
+
+summary(complete_mod)
 ```
+
+
+
+
 
 
 
