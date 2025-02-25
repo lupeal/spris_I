@@ -23,7 +23,7 @@ library(nlme)
 ## loading & cleaning data
 ```{r,message=FALSE}
 #loading data
-data <- read_csv("Project 1 - Longitudinal/data.csv")
+data <- read_csv("data.csv")
 
 dat <- data %>%
   mutate(day = as.factor(day),
@@ -306,7 +306,7 @@ ggplot(data = dat, aes(x = sqrt(MEM_comp))) +
 ```
 
 
-## fitting model:
+## fitting model(DONT FORGET AGE & GENDER):
 
 $$
 Y_{ij} = \beta_0 + \beta_{1}^{(1)} t_j + \beta_{1}^{(2)} t_j + \beta_{1}^{(3)} t_j + \beta_2 d_1 + \beta_2 d_2 +  \\
@@ -419,3 +419,53 @@ summary(mod3)
 
 
 - `random intercept`: Given the average MEM_comp score at baseline, each individual might deviate from this baseline intercept by 0.8401421. 
+
+
+
+^ original model (random intercept model? def mixed effects)
+
+
+## model with only complete cases:
+
+there are 47 total unique subjects, so complete_days should have 188 possible combos.
+
+```{r, complete cases data}
+#creating all possible combinations between subj and day
+#complete_days <- expand.grid(Subject_ID = unique(dat$Subject_ID),
+#                             day = unique(dat$day))
+
+#now joining with data to create complete data
+#contains missingness
+#all_data <- complete_days %>%
+#  left_join(dat, by = c('Subject_ID', 'day'))
+  
+
+#data containing only subjects with complete data
+#complete_data <- all_data %>%
+#  group_by(Subject_ID) %>%
+#  filter(all(!is.na(day))) %>%
+#  ungroup()
+
+
+
+#counting all time points each subj has
+subject_days <- dat %>%
+  group_by(Subject_ID) %>%
+  summarise(day_ct = n_distinct(day))
+
+#only subjects with all days
+complete_subj <- subject_days %>%
+  filter(day_ct == '4') %>%
+  pull(Subject_ID) #only 24 subj's
+
+#complete data; only subjects with all days
+complete_data <- dat %>%
+  filter(Subject_ID %in% complete_subj) #should be only 96 entries (24*4)
+```
+
+```{r}
+
+```
+
+
+
