@@ -13,6 +13,10 @@ library(corrplot)
 library(tidymodels)
 library(gridExtra)
 library(GGally)
+
+library(gee)
+library(lme4)
+library(nlme)
 ```
 
 
@@ -302,8 +306,116 @@ ggplot(data = dat, aes(x = sqrt(MEM_comp))) +
 ```
 
 
+## fitting model:
+
+$$
+Y_{ij} = \beta_0 + \beta_{1}^{(1)} t_j + \beta_{1}^{(2)} t_j + \beta_{1}^{(3)} t_j + \beta_2 d_1 + \beta_2 d_2 +  \\
+         \beta_4^{(1)}t_j \cdot d_1 + \beta_4^{(2)}t_j \cdot d_1 + \beta_4^{(3)}t_j \cdot d_1 + \\
+         \beta_5^{(1)}t_j \cdot d_1 + \beta_5^{(2)}t_j \cdot d_1 + \beta_5^{(3)}t_j \cdot d_1 + e_{ij}
+$$
+
+Note:
+
+- $\beta_1$ has three different dummy variables. They correspond to the three different time points, where Day 0 is the baseline. Thus, superscript 1 corresponds to Day 5, superscript 2 to Day 19, and superscript 3 to Day 90.
+
+- $\beta_2d_1$ is the coefficient for those in the Low Dose group, where d_1 takes in values either 0 or 1 since it is a categorical/binary variable.
+
+- $\beta_2d_2$ is the coefficient for those in the High Dose group, where d_2 takes in values either 0 or 1 since it is a categorical/binary variable.
+
+- $\beta_4$ also has three dummy variables. They correspond to the three different time points and whether they were in the Low Dose group or not. Thus, superscript 1 correspond to those at Day 5 that were in the Low Dose group, superscript 2 for those at Day 19 that were in the Low Dose group, and superscript 3 for those at Day 90 that were in the Low Dose group.
+
+- $\beta_4$ also has three dummy variables. They correspond to the three different time points and whether they were in the High Dose group or not. Thus, superscript 1 correspond to those at Day 5 that were in the High Dose group, superscript 2 for those at Day 19 that were in the High Dose group, and superscript 3 for those at Day 90 that were in the High Dose group.
+
+
+
+#generalized linear mixed effects model
+```{r, glm}
+mod <- glmer(MEM_comp ~ day + Age + Gender + Treatment_Group + (1 | Subject_ID),
+             data = dat, family = gaussian,
+             nAGQ = 0)
+
+summary(mod)
+```
+
+
+#linear mixed effects model: subj are random effects, fixed effects are other covariates
+```{r}
+mod <- lmer() #used for multiple random effects, downside is can't specify corr structure. 
+```
+
+
+#using lme() to specify the correlation matrix: Unstructured. 
+```{r}
+mod <- lme(MEM_comp ~ day + Treatment_Group + day*Treatment_Group, random = ~ 1 | Subject_ID,
+           data = dat, method = 'REML', correlation = corSymm())
+
+summary(mod)
+```
+
+#varcov matrix
+```{r}
+intercept_var <- VarCorr(mod)[1,1]
+residual_var <- VarCorr(mod)[2,1]
+
+#covariance matrix for subject Y_i
+matrix(rep(as.numeric(intercept_var), 14^2), nrow = 14) +
+  diag(residual_var, nrow = 14)
+```
+
+
+#fitting model w fixed effects too (i.e. age & gender)
+#this is only with random intercepts.
+```{r}
+mod2 <- lme(MEM_comp ~ day + Age + Gender + Treatment_Group + day*Treatment_Group,
+            random = ~ 1 | Subject_ID,
+            data = dat, method = 'REML', correlation = corSymm())
+
+summary(mod2)
+```
+
+#fitting model with fixed effects (Age & Gender) + including random intercept & slope (for Day)
+#random slop isn't working...
+```{r}
+mod3 <- lme(MEM_comp ~ day + Age + Gender + Treatment_Group + day*Treatment_Group,
+            random = ~ day | Subject_ID,
+            data = dat, method = 'REML', correlation = corSymm(),
+            control = lmeControl(opt = 'optim', maxIter = 20000000))
+
+summary(mod3)
+```
 
 
 
 
+#interpretations for mod with random intercept only:
 
+- `Intercept`: the overall average MEM_comp score for Females at Day 0 and in the Placebo group is 0.8960.
+
+- `day5`: the MEM_comp score for an individual at Day 5, holding all other predictors constant, decreases by 0.0951 compared to when at Day 0. 
+
+- `day19`: the MEM_comp score for an individual at Day 19, holding all other predictors constant, decreases by 0.2330 compared to when at Day 0.
+
+- `day90`: the MEM_comp score for an individual at Day 90, holding all other predictors constant, decreases by 0.1495 compared to when at Day 0.
+
+- `Age`: the MEM_comp score for an individual decreases by 0.0207 as age increase by 1 year.
+
+- `GenderM`: the MEM_comp score for an Male individual, holding all other predictors constant, increases by 0.0158 compared to a Female individual.
+
+- `Treatment_GroupB`: the MEM_comp score for an individual in the Low Dose treatment group, holding all other predictors constant, decreases by 0.0917 commpared to those in the Placebo group.
+
+- `Treatment_GroupC`: the MEM_comp score for an individual in the High Dose treatment group, holding all other predictors constant, decreases by 0.1881 commpared to those in the Placebo group.
+
+- `day5:Treatment_GroupB`: the MEM_comp score for an individual at Day 5 in the Low Dose group, holding all other predictors constant, decreases by 0.0515 compared to one at Day 0 in the Placebo group.
+
+- `day19:Treatment_GroupB`: the MEM_comp score for an individual at Day 19 in the Low Dose group, holding all other predictors constant, increases by 0.1749 compared to one at Day 0 in the Placebo group.
+
+- `day90:Treatment_GroupB`: the MEM_comp score for an individual at Day 90 in the Low Dose group, holding all other predictors constant, increases by 0.2544 compared to one at Day 0 in the Placebo group.
+
+- `day5:Treatment_GroupC`: the MEM_comp score for an individual at Day 5 in the High Dose group, holding all other predictors constant, increases by 0.3860 compared to one at Day 0 in the Placebo group.
+
+- `day19:Treatment_GroupC`: the MEM_comp score for an individual at Day 19 in the High Dose group, holding all other predictors constant, increases by 0.6547 compared to one at Day 0 in the Placebo group.
+
+- - `day90:Treatment_GroupC`: the MEM_comp score for an individual at Day 90 in the High Dose group, holding all other predictors constant, increases by 0.2993 compared to one at Day 0 in the Placebo group.
+
+
+- `random intercept`: Given the average MEM_comp score at baseline, each individual might deviate from this baseline intercept by 0.8401421. 
