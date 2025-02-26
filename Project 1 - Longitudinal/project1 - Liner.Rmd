@@ -1,0 +1,460 @@
+---
+title: "Longitudinal Analysis"
+output: 
+   html_document:
+     code_folding: hide
+     toc: true
+     theme: cerulean
+author: "Liner Ge"
+date: "2025-02-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+library(table1)
+library(corrplot)
+library(geepack)
+library(nlme)
+library(kableExtra)
+library(sjPlot)
+library(lmtest)
+```
+
+## Scientific Question
+
+### Primary objective
+
+- Determine whether the effect of low dose DAR-0100A and high dose DAR-0100A on improving memory as measured by the composite memory score are significantly higher than the effect of placebo at day 5, day 19, and day 90.
+
+- Determine whether the treatment effects differ over time within placebo group, low dose group and high dose group.
+
+- Determine whether the trajectory of treatment effects over time differ between placebo group, low dose group and high dose group.
+
+### Sensitivity analysis
+
+## EDA
+
+### Table 1
+
+```{r}
+data = read.csv("Project 1 - Longitudinal/data.csv") %>% 
+  mutate(day =case_when(day == 0 ~ "Day 0",
+                        day == 5 ~ "Day 5",
+                        day == 19 ~ "Day 19",
+                        day == 90 ~ "Day 90"
+                        ))
+
+data_table1= data%>% 
+  group_by(Subject_ID) %>% 
+  filter(day == "Day 0")
+
+table1(~ Age + factor(Gender) | Treatment_Group, data=data_table1)
+```
+
+```{r}
+
+data_table1= read.csv("Project 1 - Longitudinal/data.csv") %>% 
+  mutate(day =case_when(day == 0 ~ "Day0",
+                        day == 5 ~ "Day5",
+                        day == 19 ~ "Day19",
+                        day == 90 ~ "Day90"
+                        )) %>% 
+  group_by(Subject_ID) %>% 
+  pivot_wider(names_from = day,
+              values_from =MEM_comp) %>% 
+  mutate(Gender = as.factor(Gender))
+
+
+table1(~ Age + Gender+Day0+Day5+Day19+Day90 | Treatment_Group, data=data_table1)
+```
+
+
+### Spaghetti plot
+
+```{r}
+ggplot(data, aes(x=day, y = MEM_comp, group = Subject_ID, colour = Gender))+
+  geom_line()+ 
+    stat_summary(aes(group = Gender, colour = Gender), geom = "point", fun.y = mean,
+    shape = 16, size = 2)+
+  facet_grid(. ~ Treatment_Group)+
+   labs(
+       x="Time points", 
+       y = "Composite memory score")+
+  theme_light()
+
+#title="Change of composite memory score over time by treatment group"; omitting.
+```
+
+The Spaghetti plot indicates group B has greater between-subject variability.
+We can see a trend in group C (high dose) that indicates higher memory score as time goes on.
+
+
+### Boxplot for displaying the AVERAGE composite memory score by group at different time points
+
+```{r}
+line_data = data %>% 
+  group_by(Subject_ID) %>% 
+  mutate(count = n(),
+         missing = ifelse(count < 4, "Incomplete", "Complete")
+         ) %>% 
+  ungroup() %>% 
+  select(missing, day, MEM_comp, Treatment_Group) %>% 
+  group_by(missing, day, Treatment_Group) %>% 
+  mutate(mean = mean(MEM_comp)
+         ) %>% 
+  select(-MEM_comp) %>% 
+  unique() %>% 
+  ungroup %>% 
+  mutate(group = row_number())
+  
+ggplot(line_data, aes(x=day, y = mean, group = group))+
+  geom_point(aes(color = missing), size = 3) + 
+  geom_line(aes(color = missing, linetype = missing))+
+  facet_grid(. ~ Treatment_Group)+
+  labs(
+       x="Time points", 
+       y = "Average composite memory score")+
+  theme_light() +
+  scale_color_brewer(palette="Set1")
+
+#title="Plot of composite memory score by treatment group at different time points",
+```
+
+
+```{r}
+box_data = data %>% 
+  group_by(Subject_ID) %>% 
+  mutate(count = n(),
+         missing = ifelse(count < 4, "Incomplete", "Complete")) %>% 
+  ungroup() %>% 
+  select(missing, day, MEM_comp, Treatment_Group) %>% 
+  group_by(missing, day, Treatment_Group) 
+
+n_fun <- function(x) { length(x) } 
+
+ggplot(box_data, aes(x=day, y = MEM_comp))+
+  geom_boxplot(aes(color = missing))+ 
+  facet_grid(. ~ Treatment_Group)+
+  labs(
+       x="Time points", 
+       y = "Composite memory score")+
+  theme_light() +
+  scale_color_brewer(palette="Set1")
+
+#title="Plot of composite memory score by treatment group at different time points",
+```
+
+The box plot indicates different mean memory scores between groups at baseline.
+
+
+
+
+### Correlation matrix
+
+```{r}
+cor_data = data %>% 
+  pivot_wider( names_from = day,
+              values_from = MEM_comp) %>% 
+  mutate(
+    Age = as.numeric(Age),
+    Gender = case_when(Gender == "M" ~ 1,
+                            Gender == "F" ~ 0,
+                            ),
+         Treatment_Group =case_when(Treatment_Group=="A" ~ 0,
+                                    Treatment_Group=="B" ~ 1,
+                                    Treatment_Group=="C" ~ 2,)
+         ) %>% 
+  select(-Subject_ID)
+
+corrplot(cor(cor_data, use='complete.obs'), addCoef.col = "red", type = "upper",tl.col="black", tl.srt=20)
+```
+
+The correlation matrix shows there isn’t any high correlations between variables except for these repeated measurements.
+
+### Check the normality of the response
+```{r, message=FALSE}
+qqnorm(data$MEM_comp)
+qqline(data$MEM_comp, col = 'steelblue', main = "Normal Q-Q Plot for Response")
+```
+
+```{r}
+ggplot(data = data, aes(x = MEM_comp)) +
+  geom_histogram(,color="darkblue", fill="lightblue")+
+  labs(
+       x="Composite memory score",
+       y="Count")+
+  theme_classic()
+
+#title="Composite memory score distribution",
+```
+
+Both QQ plot and histogram plot indicting the response is normally distributed.
+
+## Main analysis
+
+### Linear mixed effect model 
+
+$$\begin{equation}
+Y_{ij} = \beta_{0}+\beta_{1}\times Day_{j} +\beta_{2} \times Group_{i} + \beta_{3}\times Age_{i} +\beta_{40.} \times Gender_{i} + \beta_{5}\times Day_{j} \times Group_{i} +b_{0i} + b_{1i}\times Day_{j} + \xi_{ij}
+\end{equation}$$
+
+```{r}
+model1 = lme(MEM_comp ~ day+Treatment_Group+Treatment_Group*day+Age+Gender, 
+                data = data, 
+                random = ~ 1|Subject_ID, 
+               correlation = corSymm())
+
+sum_m1 = summary(model1)$tTable %>% as.data.frame()
+
+sum_m1 %>% 
+   knitr::kable(
+     caption = "Coefficients", 
+     align = "lcccccccccccc"
+     ) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) 
+```
+
+
+### Compare treatment effect between groups at day 5, day 19, and day 90
+
+We define treatment effect as the change of memory score from baseline.
+
+```{r}
+m1_eatimate = data.frame(
+  Group = c("Group A","Group B","Group C", "Group B - Group A", "P-value" , "Group C - Group A", "P-value"),
+  Parameter1 =c("$\\beta_1^{d5}$","$\\beta_1^{d5}+\\beta_5^{d5\\times B}$", "$\\beta_1^{d5}+\\beta_5^{d5\\times C}$", "$\\beta_5^{d5\\times B}$", "", "$\\beta_5^{d5\\times C}$",""),
+  Day5_vs_Day0= c(sum_m1[3,1],sum_m1[3,1]+sum_m1[10,1],sum_m1[3,1]+sum_m1[13,1], sum_m1[10,1], sum_m1[10,5], sum_m1[13,1],sum_m1[13,5]),
+  Parameter2 =c("$\\beta_1^{d19}$","$\\beta_1^{d19}+\\beta_5^{d19\\times B}$", "$\\beta_1^{d19}+\\beta_5^{d19\\times C}$", "$\\beta_5^{d19\\times B}$", "", "$\\beta_5^{d19\\times C}$",""),
+  Day19_vs_Day0= c(sum_m1[2,1],sum_m1[2,1]+sum_m1[9,1],sum_m1[2,1]+sum_m1[12,1], sum_m1[9,1], sum_m1[9,5], sum_m1[12,1], sum_m1[12,5]),
+  Parameter3 =c("$\\beta_1^{d90}$","$\\beta_1^{d90}+\\beta_5^{d90\\times B}$", "$\\beta_1^{d90}+\\beta_5^{d90\\times C}$", "$\\beta_5^{d90\\times B}$", "", "$\\beta_5^{d90\\times C}$",""),
+  Day90_vs_Day0= c(sum_m1[4,1],sum_m1[4,1]+sum_m1[11,1],sum_m1[4,1]+sum_m1[14,1], sum_m1[11,1], sum_m1[11,5], sum_m1[14,1], sum_m1[14,5])
+)
+
+m1_eatimate %>%
+   knitr::kable(
+     caption = "Estimated treatment effects", 
+     align = "lcccccccccccc",
+     col.names = c("Item", "Parameter", "Day5 - Day0", "Parameter", "Day19 - Day0", "Parameter", "Day90 - Day0")
+     ) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) 
+```
+
+The treatment effect of high dose level DAR-0010A on improving memory is significantly higher (effect size: `r sum_m1[13,1]`, 90%CI: `r round(sum_m1[13,1]-1.64*sum_m1[13,2], digits= 2)` - `r round(sum_m1[13,1]+1.64*sum_m1[13,2], digits= 2)` ) than the effect of placebo at day 5 with a significant level of 0.1. The power to detect a standard effect size of `r round(sum_m1[13,1]/sum_m1[13,2], digits= 2)` with a sample size of 17 subjects in placebo group and 15 subjects in high dose group at a significant level of 0.1 is 100%.
+
+The treatment effect of high dose level DAR-0010A on improving memory is significantly higher (effect size: `r sum_m1[12,1]`, 95%CI: `r round(sum_m1[12,1]-1.96*sum_m1[12,2], digits= 2)` - `r round(sum_m1[12,1]+1.96*sum_m1[12,2], digits= 2)` ) than the effect of placebo at day 19 with a significant level of 0.05. The power to detect a standard effect size of `r round(sum_m1[12,1]/sum_m1[12,2], digits= 2)` with a sample size of 13 subjects in placebo group and 13 subjects in high dose group at a significant level of 0.05 is 100%.
+
+### Determine whether treatment effect change over time within group
+
+```{r}
+m1_covariance = model1[["varFix"]] %>% as.data.frame()
+p_b12_b11 = 2*(1-pnorm(abs((sum_m1[2,1]-sum_m1[3,1])/sqrt(sum_m1[2,2]^2+sum_m1[3,2]^2-2*m1_covariance[3,2]))))
+p_b13_b11 = 2*(1-pnorm(abs((sum_m1[4,1]-sum_m1[3,1])/sqrt(sum_m1[4,2]^2+sum_m1[3,2]^2-2*m1_covariance[3,4]))))
+p_b13_b12 = 2*(1-pnorm(abs((sum_m1[4,1]-sum_m1[2,1])/sqrt(sum_m1[4,2]^2+sum_m1[2,2]^2-2*m1_covariance[2,4]))))
+
+ga_eatimate = data.frame(
+  Day = c("Day 5 - Day 0", 
+          "Day 19 - Day 0", 
+          "Day 19 - Day 5", 
+          "Day 90 - Day 0", 
+          "Day 90 - Day 5", 
+          "Day 90 - Day 19"),
+  Parameter =c("$\\beta_1^{d5}$","$\\beta_1^{d19}$", "$\\beta_1^{d19}-\\beta_1^{d5}$", "$\\beta_1^{d90}$","$\\beta_1^{d90}-\\beta_1^{d5}$", "$\\beta_1^{d90}-\\beta_1^{d19}$"),
+  Estimate= c(sum_m1[3,1],sum_m1[2,1],sum_m1[2,1]-sum_m1[3,1],sum_m1[4,1], sum_m1[4,1]-sum_m1[3,1],sum_m1[4,1]-sum_m1[2,1]),
+  Wald_test_P_value= c(sum_m1[3,5],sum_m1[2,5],p_b12_b11, sum_m1[4,5], p_b13_b11,p_b13_b12)
+)
+
+ga_eatimate  %>%
+   knitr::kable(
+     caption = "Estimated effects change within placebo group", 
+     align = "lcccccccccccc"
+     ) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) 
+```
+
+```{r}
+m1_covariance = model1[["varFix"]] %>% as.data.frame()
+p1 = 2*(1-pnorm(abs((sum_m1[3,1]+sum_m1[10,1])/sqrt(sum_m1[3,2]^2+sum_m1[10,2]^2+2*m1_covariance[3,10]))))
+p2 = 2*(1-pnorm(abs((sum_m1[2,1]+sum_m1[9,1])/sqrt(sum_m1[2,2]^2+sum_m1[9,2]^2-2*m1_covariance[2,9]))))
+p3 = 2*(1-pnorm(abs((sum_m1[2,1]+sum_m1[9,1]-sum_m1[3,1]-sum_m1[10,1])/sqrt(t(c(1,1,-1,-1))%*%matrix(c(m1_covariance[2,2], m1_covariance[2,9],m1_covariance[2,3],m1_covariance[2,10],m1_covariance[9,2],m1_covariance[9,9],m1_covariance[9,3],m1_covariance[9,10],m1_covariance[3,2],m1_covariance[3,9],m1_covariance[3,3],m1_covariance[3,10],m1_covariance[10,2],m1_covariance[10,9],m1_covariance[10,3],m1_covariance[10,10]), nrow=4,byrow=T)%*%c(1,1,-1,-1))))) %>% as.numeric()
+p4 = 2*(1-pnorm(abs((sum_m1[4,1]+sum_m1[11,1])/sqrt(sum_m1[4,2]^2+sum_m1[11,2]^2-2*m1_covariance[11,4]))))
+p5 = 2*(1-pnorm(abs((sum_m1[4,1]+sum_m1[11,1]-sum_m1[3,1]-sum_m1[10,1])/sqrt(t(c(1,1,-1,-1))%*%matrix(c(m1_covariance[4,4], m1_covariance[4,11],m1_covariance[4,3],m1_covariance[4,10],m1_covariance[11,4],m1_covariance[11,11],m1_covariance[11,3],m1_covariance[11,10],m1_covariance[3,4],m1_covariance[3,11],m1_covariance[3,3],m1_covariance[3,10],m1_covariance[10,4],m1_covariance[10,11],m1_covariance[10,3],m1_covariance[10,10]), nrow=4,byrow=T)%*%c(1,1,-1,-1))))) %>% as.numeric()
+p6 = 2*(1-pnorm(abs((sum_m1[4,1]+sum_m1[11,1]-sum_m1[2,1]-sum_m1[9,1])/sqrt(t(c(1,1,-1,-1))%*%matrix(c(m1_covariance[4,4], m1_covariance[4,11],m1_covariance[4,2],m1_covariance[4,9],m1_covariance[11,4],m1_covariance[11,11],m1_covariance[11,2],m1_covariance[11,9],m1_covariance[9,4],m1_covariance[9,11],m1_covariance[9,9],m1_covariance[9,2],m1_covariance[2,4],m1_covariance[2,11],m1_covariance[2,9],m1_covariance[2,2]), nrow=4,byrow=T)%*%c(1,1,-1,-1))))) %>% as.numeric()
+
+gb_eatimate = data.frame(
+  Day = c("Day 5 - Day 0", 
+          "Day 19 - Day 0", 
+          "Day 19 - Day 5", 
+          "Day 90 - Day 0", 
+          "Day 90 - Day 5", 
+          "Day 90 - Day 19"),
+  Parameter =c("$\\beta_1^{d5}+\\beta_5^{d5\\times B}$",
+               "$\\beta_1^{d19}+\\beta_5^{d19\\times B}$", 
+               "$\\beta_1^{d19}+\\beta_5^{d19\\times B}-(\\beta_1^{d5}+\\beta_5^{d5\\times B})$",
+               "$\\beta_1^{d90}+\\beta_5^{d90\\times B}$",
+               "$\\beta_1^{d90}+\\beta_5^{d90\\times B}-(\\beta_1^{d5}+\\beta_5^{d5\\times B})$",
+               "$\\beta_1^{d90}+\\beta_5^{d90\\times B}-(\\beta_1^{d19}+\\beta_5^{d19\\times B})$"),
+  Estimate= c(sum_m1[3,1]+sum_m1[10,1],sum_m1[2,1]+sum_m1[9,1],(sum_m1[2,1]+sum_m1[9,1])-(sum_m1[3,1]+sum_m1[10,1]),sum_m1[4,1]+sum_m1[11,1], sum_m1[4,1]+sum_m1[11,1]-sum_m1[3,1]-sum_m1[10,1],sum_m1[4,1]+sum_m1[11,1]-sum_m1[2,1]-sum_m1[9,1]),
+  Wald_test_P_value= c(p1,p2,p3,p4,p5,p6)
+)
+
+gb_eatimate  %>%
+   knitr::kable(
+     caption = "Estimated effects change within low dose group", 
+     align = "lcccccccccccc"
+     ) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) 
+```
+
+
+```{r}
+m1_covariance = model1[["varFix"]] %>% as.data.frame()
+p1_c = 2*(1-pnorm(abs((sum_m1[3,1]+sum_m1[13,1])/sqrt(sum_m1[3,2]^2+sum_m1[13,2]^2+2*m1_covariance[3,13]))))
+p2_c = 2*(1-pnorm(abs((sum_m1[2,1]+sum_m1[12,1])/sqrt(sum_m1[2,2]^2+sum_m1[12,2]^2-2*m1_covariance[2,12]))))
+p3_c = 2*(1-pnorm(abs((sum_m1[2,1]+sum_m1[12,1]-sum_m1[3,1]-sum_m1[13,1])/sqrt(t(c(1,1,-1,-1))%*%matrix(c(m1_covariance[2,2], m1_covariance[2,12],m1_covariance[2,3],m1_covariance[2,13],m1_covariance[12,2],m1_covariance[12,12],m1_covariance[12,3],m1_covariance[12,13],m1_covariance[3,2],m1_covariance[3,12],m1_covariance[3,3],m1_covariance[3,13],m1_covariance[13,2],m1_covariance[13,12],m1_covariance[13,3],m1_covariance[13,13]), nrow=4,byrow=T)%*%c(1,1,-1,-1))))) %>% as.numeric()
+p4_c = 2*(1-pnorm(abs((sum_m1[4,1]+sum_m1[14,1])/sqrt(sum_m1[4,2]^2+sum_m1[14,2]^2-2*m1_covariance[14,4]))))
+p5_c = 2*(1-pnorm(abs((sum_m1[4,1]+sum_m1[14,1]-sum_m1[3,1]-sum_m1[13,1])/sqrt(t(c(1,1,-1,-1))%*%matrix(c(m1_covariance[4,4], m1_covariance[4,14],m1_covariance[4,3],m1_covariance[4,13],m1_covariance[14,4],m1_covariance[14,14],m1_covariance[14,3],m1_covariance[14,13],m1_covariance[3,4],m1_covariance[3,14],m1_covariance[3,3],m1_covariance[3,13],m1_covariance[13,4],m1_covariance[13,14],m1_covariance[13,3],m1_covariance[13,13]), nrow=4,byrow=T)%*%c(1,1,-1,-1))))) %>% as.numeric()
+p6_c = 2*(1-pnorm(abs((sum_m1[4,1]+sum_m1[14,1]-sum_m1[2,1]-sum_m1[12,1])/sqrt(t(c(1,1,-1,-1))%*%matrix(c(m1_covariance[4,4], m1_covariance[4,14],m1_covariance[4,2],m1_covariance[4,12],m1_covariance[14,4],m1_covariance[14,14],m1_covariance[14,2],m1_covariance[14,12],m1_covariance[12,4],m1_covariance[12,14],m1_covariance[12,12],m1_covariance[12,2],m1_covariance[2,4],m1_covariance[2,14],m1_covariance[2,12],m1_covariance[2,2]), nrow=4,byrow=T)%*%c(1,1,-1,-1))))) %>% as.numeric()
+
+gc_eatimate = data.frame(
+  Day = c("Day 5 - Day 0", 
+          "Day 19 - Day 0", 
+          "Day 19 - Day 5", 
+          "Day 90 - Day 0", 
+          "Day 90 - Day 5", 
+          "Day 90 - Day 19"),
+   Parameter =c("$\\beta_1^{d5}+\\beta_5^{d5\\times C}$",
+               "$\\beta_1^{d19}+\\beta_5^{d19\\times C}$", 
+               "$\\beta_1^{d19}+\\beta_5^{d19\\times C}-(\\beta_1^{d5}+\\beta_5^{d5\\times C})$",
+               "$\\beta_1^{d90}+\\beta_5^{d90\\times C}$",
+               "$\\beta_1^{d90}+\\beta_5^{d90\\times C}-(\\beta_1^{d5}+\\beta_5^{d5\\times C})$",
+               "$\\beta_1^{d90}+\\beta_5^{d90\\times C}-(\\beta_1^{d19}+\\beta_5^{d19\\times C})$"),
+  Estimate= c(sum_m1[3,1]+sum_m1[13,1],sum_m1[2,1]+sum_m1[12,1],(sum_m1[2,1]+sum_m1[12,1])-(sum_m1[3,1]+sum_m1[13,1]),sum_m1[4,1]+sum_m1[14,1], sum_m1[4,1]+sum_m1[14,1]-sum_m1[3,1]-sum_m1[13,1],sum_m1[4,1]+sum_m1[14,1]-sum_m1[2,1]-sum_m1[12,1]),
+  Wald_test_P_value= c(p1_c,p2_c,p3_c,p4_c,p5_c,p6_c)
+)
+
+gc_eatimate  %>%
+   knitr::kable(
+     caption = "Estimated effects change within high dose group", 
+     align = "lcccccccccccc"
+     ) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) 
+```
+
+Among high dose group, the change of memory score from day 0 to day 5 (`r sum_m1[3,1]+sum_m1[13,1]`, 95%CI: `r round(sum_m1[3,1]+sum_m1[13,1]-1.96*sqrt(sum_m1[3,2]^2+sum_m1[13,2]^2+2*m1_covariance[3,13]), digits=2)`-`r round(sum_m1[3,1]+sum_m1[13,1]+1.96*sqrt(sum_m1[3,2]^2+sum_m1[13,2]^2+2*m1_covariance[3,13]), digits =2)`) is significant at a significant level of 0.05.
+
+### Determine whether trajectories differ between group
+
+```{r}
+ba_3 = 2*(1-pnorm(abs((sum_m1[9,1]-sum_m1[10,1])/sqrt(sum_m1[9,2]^2+sum_m1[10,2]^2-2*m1_covariance[9,10]))))
+ba_5 = 2*(1-pnorm(abs((sum_m1[11,1]-sum_m1[10,1])/sqrt(sum_m1[10,2]^2+sum_m1[11,2]^2-2*m1_covariance[11,10]))))
+ba_6 = 2*(1-pnorm(abs((sum_m1[11,1]-sum_m1[9,1])/sqrt(sum_m1[11,2]^2+sum_m1[9,2]^2-2*m1_covariance[9,11]))))
+
+ca_3 = 2*(1-pnorm(abs((sum_m1[12,1]-sum_m1[13,1])/sqrt(sum_m1[12,2]^2+sum_m1[13,2]^2-2*m1_covariance[13,12]))))
+ca_5 = 2*(1-pnorm(abs((sum_m1[14,1]-sum_m1[13,1])/sqrt(sum_m1[14,2]^2+sum_m1[13,2]^2-2*m1_covariance[13,14]))))
+ca_6 = 2*(1-pnorm(abs((sum_m1[14,1]-sum_m1[12,1])/sqrt(sum_m1[14,2]^2+sum_m1[12,2]^2-2*m1_covariance[12,14]))))
+
+
+between_group_eatimate = data.frame(
+  Day = c("Day 5 - Day 0", 
+          "Day 19 - Day 0", 
+          "Day 19 - Day 5", 
+          "Day 90 - Day 0", 
+          "Day 90 - Day 5", 
+          "Day 90 - Day 19"),
+   b_vs_a =c("$\\beta_5^{d5\\times B}$",
+               "$\\beta_5^{d19\\times B}$", 
+               "$\\beta_5^{d19\\times B}-\\beta_5^{d5\\times B}$",
+               "$\\beta_5^{d90\\times B}$",
+               "$\\beta_5^{d90\\times B}-\\beta_5^{d5\\times B}$",
+               "$\\beta_5^{d90\\times B}-\\beta_5^{d19\\times B}$"),
+  ba_estimate= c(sum_m1[10,1],sum_m1[9,1],sum_m1[9,1]-sum_m1[10,1],sum_m1[11,1], sum_m1[11,1]-sum_m1[10,1],sum_m1[11,1]-sum_m1[9,1]),
+  ba_P_value= c(sum_m1[10,5],sum_m1[9,5],ba_3,sum_m1[11,5],ba_5,ba_6),
+   c_vs_a =c("$\\beta_5^{d5\\times C}$",
+               "$\\beta_5^{d19\\times C}$", 
+               "$\\beta_5^{d19\\times C}-\\beta_5^{d5\\times C}$",
+               "$\\beta_5^{d90\\times C}$",
+               "$\\beta_5^{d90\\times C}-\\beta_5^{d5\\times C}$",
+               "$\\beta_5^{d90\\times C}-\\beta_5^{d19\\times C}$"),
+  ca_estimate= c(sum_m1[13,1],sum_m1[12,1],(sum_m1[12,1])-(sum_m1[13,1]),sum_m1[14,1], sum_m1[14,1]-sum_m1[13,1],sum_m1[14,1]-sum_m1[12,1]),
+  ca_P_value= c(sum_m1[13,5],sum_m1[12,5],ca_3,sum_m1[14,5],ca_5,ca_6)
+ 
+)
+
+between_group_eatimate%>%
+   knitr::kable(
+     caption = "Estimated trajectories difference between group", 
+     align = "lcccccccccccc",
+     col.names = c("Path", "Group B - Group A", "Estimate","P-value", "Group C - Group A", "Estimate","P-value")
+     ) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) 
+```
+
+## Sentivity analysis
+
+### If any missing
+
+```{r}
+imputate_data= data %>% 
+  group_by(Subject_ID) %>% 
+  mutate(count = n(),
+         missing = ifelse(count<4, "Incomplete", "Complete")
+         ) %>% 
+  ungroup() 
+```
+
+```{r}
+if_any_missing = imputate_data %>% 
+  filter(missing == "Incomplete")
+
+complete = imputate_data %>% 
+  filter(missing == "Complete")
+```
+
+```{r}
+model_missing = lme(MEM_comp ~ day+Treatment_Group+Treatment_Group*day+Age+Gender, 
+                data = if_any_missing, 
+                random = ~ 1|Subject_ID, 
+               correlation = corSymm())
+
+model_complete = lme(MEM_comp ~ day+Treatment_Group+Treatment_Group*day+Age+Gender, 
+                data = complete, 
+                random = ~ 1|Subject_ID, 
+               correlation = corSymm())
+
+sum_m1 = summary(model_missing)$tTable %>% as.data.frame()
+
+sum_m1 %>% 
+   knitr::kable(
+     caption = "Coefficients", 
+     align = "lcccccccccccc"
+     ) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) 
+```
+
+
+```{r}
+sum_m2 = summary(model_complete)$tTable %>% as.data.frame()
+
+sum_m2 %>% 
+   knitr::kable(
+     caption = "Coefficients", 
+     align = "lcccccccccccc"
+     ) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) 
+```
+
+
+
+
+
+```{r}
+tab_model(model1, model_complete ,model_missing, transform = NULL, df.method = "wald",
+           dv.labels = c("Main Model", "Complete Data", "If Any Missing"))
+
+waldtest(model1,model_missing ,model_complete)
+```
+
