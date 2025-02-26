@@ -17,13 +17,16 @@ library(GGally)
 library(gee)
 library(lme4)
 library(nlme)
+
+library(sjPlot)
+library(performance)
 ```
 
 
 ## loading & cleaning data
 ```{r,message=FALSE}
 #loading data
-data <- read_csv("data.csv")
+data <- read_csv("Project 1 - Longitudinal/data.csv")
 
 dat <- data %>%
   mutate(day = as.factor(day),
@@ -107,8 +110,8 @@ sum_tble <- dat %>%
                 stat_1 = paste('**High dose**, N = ', grp_sum$unique_subjects[3]),
                 stat_2 = paste('**Low dose**, N = ', grp_sum$unique_subjects[2]),
                 stat_3 = paste('**Placebo**, N = ', grp_sum$unique_subjects[1])) %>%
-  bold_labels() %>%
-  modify_caption('Table 1. Summary statistics')
+  bold_labels() 
+  #%>%modify_caption('Table 1. Summary statistics')
 
 #or patient characteristics
 ```
@@ -116,7 +119,7 @@ sum_tble <- dat %>%
 
 #modifying table vals
 ```{r}
-sum_tble %>%
+mod_tble <- sum_tble %>%
     modify_table_body(~ .x %>%
                       #editing Age vals
                       mutate(stat_1 = ifelse(variable == 'Age', paste(unique_sum$avg_age[3],
@@ -432,7 +435,7 @@ summary(mod3)
 
 there are 47 total unique subjects, so complete_days should have 188 possible combos.
 
-```{r, complete cases data}
+```{r, ignore}
 #creating all possible combinations between subj and day
 #complete_days <- expand.grid(Subject_ID = unique(dat$Subject_ID),
 #                             day = unique(dat$day))
@@ -448,9 +451,11 @@ there are 47 total unique subjects, so complete_days should have 188 possible co
 #  group_by(Subject_ID) %>%
 #  filter(all(!is.na(day))) %>%
 #  ungroup()
+```
 
 
 
+```{r, complete cases data}
 #counting all time points each subj has
 subject_days <- dat %>%
   group_by(Subject_ID) %>%
@@ -470,7 +475,7 @@ complete_data <- dat %>%
 ```{r, model w complete data}
 complete_mod <- lme(MEM_comp ~ day + Age + Gender + Treatment_Group + day*Treatment_Group,
                     random = ~ 1 | Subject_ID,
-                    data = dat, method = 'REML', correlation = corSymm())
+                    data = complete_data, method = 'REML', correlation = corSymm())
 
 summary(complete_mod)
 ```
@@ -479,5 +484,55 @@ summary(complete_mod)
 
 
 
+## model w missing data:
 
+```{r}
+#only subjects with missing days
+incomplete_subj <- subject_days %>%
+  filter(day_ct < '4') %>%
+  pull(Subject_ID) #
+
+#incomplete data; only subjects with all days
+missing_data <- dat %>%
+  filter(Subject_ID %in% incomplete_subj)
+```
+
+
+```{r}
+missing_mod <- lme(MEM_comp ~ day + Age + Gender + Treatment_Group + day*Treatment_Group,
+                    random = ~ 1 | Subject_ID,
+                    data = missing_data, method = 'REML', correlation = corSymm())
+
+summary(missing_mod)
+```
+
+
+
+##comparing three models:
+```{r}
+tab_model(mod2, complete_mod, missing_mod, transform = NULL, p.val = 'wald',
+          dv.labels = c("Main Model", "Complete Data", "If Any Missing"))
+```
+
+
+```{r}
+compare_performance(mod2, complete_mod, missing_mod)
+```
+
+```{r}
+anova(mod2, complete_mod, missing_mod)
+```
+
+
+
+sensitivity analysis: two models, one with missing data and other with complete data. 
+
+pattern-mixture model: same as above^. 
+
+
+how to compare the models. 
+
+```{r}
+
+```
 
