@@ -203,8 +203,27 @@ Y_{ij} = \beta_{0}+\beta_{1}\times Day_{j} +\beta_{2} \times Group_{i} + \beta_{
 \end{equation}$$
 
 ```{r}
+imputate_data= data %>% 
+  group_by(Subject_ID) %>% 
+  mutate(count = n(),
+         missing = ifelse(count<4, "Incomplete", "Complete")
+         ) %>% 
+  ungroup() 
+
+
+
+if_any_missing = imputate_data %>% 
+  filter(missing == "Incomplete")
+
+complete = imputate_data %>% 
+  filter(missing == "Complete")
+
+
+
+
+
 model1 = lme(MEM_comp ~ day+Treatment_Group+Treatment_Group*day+Age+Gender, 
-                data = data, 
+                data = if_any_missing, 
                 random = ~ 1|Subject_ID, 
                correlation = corSymm())
 
@@ -249,6 +268,8 @@ The treatment effect of high dose level DAR-0010A on improving memory is signifi
 
 ### Determine whether treatment effect change over time within group
 
+
+#PLACEBO
 ```{r}
 m1_covariance = model1[["varFix"]] %>% as.data.frame()
 p_b12_b11 = 2*(1-pnorm(abs((sum_m1[2,1]-sum_m1[3,1])/sqrt(sum_m1[2,2]^2+sum_m1[3,2]^2-2*m1_covariance[3,2]))))
@@ -275,6 +296,8 @@ ga_eatimate  %>%
   kable_styling(bootstrap_options = c("striped", "hover")) 
 ```
 
+
+#LOW DOSE
 ```{r}
 m1_covariance = model1[["varFix"]] %>% as.data.frame()
 p1 = 2*(1-pnorm(abs((sum_m1[3,1]+sum_m1[10,1])/sqrt(sum_m1[3,2]^2+sum_m1[10,2]^2+2*m1_covariance[3,10]))))
@@ -310,6 +333,8 @@ gb_eatimate  %>%
 ```
 
 
+
+#HIGH DOSE
 ```{r}
 m1_covariance = model1[["varFix"]] %>% as.data.frame()
 p1_c = 2*(1-pnorm(abs((sum_m1[3,1]+sum_m1[13,1])/sqrt(sum_m1[3,2]^2+sum_m1[13,2]^2+2*m1_covariance[3,13]))))

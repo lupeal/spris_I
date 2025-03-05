@@ -20,7 +20,22 @@ library(nlme)
 
 library(sjPlot)
 library(performance)
+
+library(naniar)
 ```
+
+
+# Objectives:
+
+The primary objective of this analysis is to assess whether DAR-0100A treatment at a low dose or high dose, when compared to placebo, improves memory as measured through the memory composite score. More specifically, we assess whether treatment effect (measured by change in composite score at baseline Day 0) changes over time between treatment groups and placebo, and whether the trajectory of treatment effect between time points differed between treatment groups and placebo.
+
+
+
+
+
+
+
+
 
 
 ## loading & cleaning data
@@ -273,6 +288,141 @@ dat %>%
   bold_labels() %>%
   modify_caption('Table 1. Summary statistics')
 ```
+
+
+## spaghetti plot:
+
+```{r}
+mean_spag <- data %>%
+  group_by(day, Gender, Treatment_Group) %>%
+  summarize(mean_comp = mean(MEM_comp))
+
+
+ggplot(data, aes(x=day, y = MEM_comp, group = Subject_ID, colour = Gender))+
+  geom_line()+ 
+    stat_summary(aes(group = Gender, colour = Gender), geom = "point", fun.y = mean,
+    shape = 16, size = 2) +
+  geom_text(data = mean_spag, aes(x = day, y = mean_comp, label = round(mean_comp, 3)),
+            size = 3, vjust = 1.6, hjust = 0.5, inherit.aes = FALSE) + 
+  facet_grid(. ~ Treatment_Group)+
+   labs(
+       x="Time points", 
+       y = "Composite memory score")+
+  theme_light()
+
+
+#title="Change of composite memory score over time by treatment group"; omitting.
+#    geom_text(aes(x = day, y = MEM_comp, label = round(MEM_comp, 1)), 
+#            data = data, 
+#            size = 3, 
+#            vjust = -0.5, 
+#            hjust = -0.1) + 
+```
+
+(With each point being the average at each time point)
+how to add the point values.
+
+The Spaghetti plot indicates group B has greater between-subject variability.
+We can see a trend in group C (high dose) that indicates higher memory score as time goes on.
+
+
+
+## Displaying the AVERAGE composite memory score by group at different time points
+
+```{r}
+line_data = data %>% 
+  group_by(Subject_ID) %>% 
+  mutate(count = n(),
+         missing = ifelse(count < 4, "Incomplete", "Complete")
+         ) %>% 
+  ungroup() %>% 
+  select(missing, day, MEM_comp, Treatment_Group) %>% 
+  group_by(missing, day, Treatment_Group) %>% 
+  mutate(mean = mean(MEM_comp)
+         ) %>% 
+  select(-MEM_comp) %>% 
+  unique() %>% 
+  ungroup %>% 
+  mutate(group = row_number())
+  
+ggplot(line_data, aes(x=day, y = mean, group = group))+
+  geom_point(aes(color = missing), size = 3) + 
+  geom_line(aes(color = missing, linetype = missing))+
+  geom_text(aes(label = round(mean, 3)), size = 3, vjust = 1.85, hjust = 0.5) +
+  facet_grid(. ~ Treatment_Group)+
+  labs(
+       x="Time points", 
+       y = "Average composite memory score")+
+  theme_light() +
+  scale_color_brewer(palette="Set1")
+
+#title="Plot of composite memory score by treatment group at different time points",
+```
+
+
+```{r}
+box_data = data %>% 
+  group_by(Subject_ID) %>% 
+  mutate(count = n(),
+         missing = ifelse(count < 4, "Incomplete", "Complete")) %>% 
+  ungroup() %>% 
+  select(missing, day, MEM_comp, Treatment_Group) %>% 
+  group_by(missing, day, Treatment_Group) 
+
+n_fun <- function(x) { length(x) } 
+
+ggplot(box_data, aes(x=day, y = MEM_comp))+
+  geom_boxplot(aes(color = missing))+ 
+  facet_grid(. ~ Treatment_Group)+
+  labs(
+       x="Time points", 
+       y = "Composite memory score")+
+  theme_light() +
+  scale_color_brewer(palette="Set1")
+
+#title="Plot of composite memory score by treatment group at different time points",
+```
+
+The box plot indicates different mean memory scores between groups at baseline.
+
+
+
+## better correlation matrix:
+
+```{r}
+cor_data = data %>% 
+  pivot_wider( names_from = day,
+              values_from = MEM_comp) %>% 
+  mutate(
+    Age = as.numeric(Age),
+    Gender = case_when(Gender == "M" ~ 1,
+                            Gender == "F" ~ 0,
+                            ),
+         Treatment_Group =case_when(Treatment_Group=="A" ~ 0,
+                                    Treatment_Group=="B" ~ 1,
+                                    Treatment_Group=="C" ~ 2,)
+         ) %>% 
+  select(-Subject_ID)
+
+corrplot(cor(cor_data, use='complete.obs'), addCoef.col = "red", type = "upper",tl.col="black", tl.srt=20)
+```
+
+
+```{r}
+ggplot(data = data, aes(x = MEM_comp)) +
+  geom_histogram(,color="darkblue", fill="lightblue")+
+  labs(
+       x="Composite memory score",
+       y="Count")+
+  theme_classic()
+
+#title="Composite memory score distribution",
+```
+
+
+
+
+
 
 
 
@@ -533,6 +683,42 @@ pattern-mixture model: same as above^.
 how to compare the models. 
 
 ```{r}
-
+anova(mod2, mod)
 ```
+
+
+```{r}
+mcar_test(data)
+```
+
+
+```{r, wald test comparing equality of coeffs}
+coef_missing=summary(missing_mod)$tTable %>% as.data.frame()
+coef_complete=summary(complete_mod)$tTable %>% as.data.frame()
+ 
+wald_test = function(data1, data2){
+  coef1=data1$Value
+  coef2=data2$Value
+  sd1=data1$Std.Error
+  sd2=data2$Std.Error
+  n=length(coef1)
+  p=c()
+  for(i in 1:n) {
+    diff = coef1[i]-coef2[i]
+    sd = sqrt(sd1[i]^2+sd2[i]^2)
+    p_value =2*(1-pnorm(abs(diff/sd)))
+    p=c(p, p_value)
+  }
+  return(p)
+}
+ 
+p_complete_missing = wald_test(coef_missing, coef_complete)
+p_complete_missing
+```
+0.2038738 0.4544075 0.7672979 0.4357505 0.8839424 0.7545720 0.3455416 0.4610626 0.4326813 0.4451946 0.8993288 0.9842336 0.6593632 0.4726437
+
+int       d5        d19       d90       trtB      trtC      Age       Gender    d5:B      
+
+
+
 
