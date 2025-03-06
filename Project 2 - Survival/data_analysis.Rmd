@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
+library(ggplot2)
 ```
 
 
@@ -16,5 +17,63 @@ library(tidyverse)
 ##loading & cleaning data:
 ```{r}
 menopause_dat <- read.delim("Project 2 - Survival/Menopause.dat", header = FALSE)
+
+menopause <- menopause_dat %>%
+  rename(id = V1,
+         intake_age = V2,
+         menopause_age = V3,
+         menopause = V4,
+         race = V5,
+         education = V6) %>%
+  mutate(menopause_time = menopause_age - intake_age)
+
+
+#description of variables:
+#menopause = 1 (observed to experience menopause), 
+#            0 (censored at menopause age)
+
+#race = 0 (White, non-hispanic),
+#       1 (Black, non-hispanic),
+#       2 (Other)
+
+#education = 0 (post-grad),
+#            1 (college grad),
+#            2 (some college),
+#            3 (high school or less)
+
+
+#menopause time = the duration of time in study at which the subject experienced menopause
 ```
+
+
+#Part A
+
+##1A. Estimate median menopause time for all subjects, disregarding covariates. 
+
+note: suppose that menopause time distribution is approx. exponential. 
+
+
+##exploring distribution of menopause time:
+```{r}
+ggplot(data = menopause, aes(x = menopause_time)) +
+  geom_histogram()
+```
+
+
+#computing median menopause time:
+```{r}
+median(menopause$menopause_time)
+```
+
+4.0424
+
+
+
+
+
+
+
+
+
+
 
