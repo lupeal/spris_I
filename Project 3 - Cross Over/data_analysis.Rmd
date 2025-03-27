@@ -1,0 +1,34 @@
+---
+title: "data_analysis"
+author: "Lupe Antonio"
+date: "2025-03-27"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Study Design / Objectives:
+
+MATIK is a newly discovered, highly contagious viral skin disease that causes skin rash and infectious in patients, and could even be life threatening. 
+
+A Phase II trial is conducted to evaluate the safety and adherence of all three medications simultaneuously (Pill A, Gel B, Gel C). It is a Phase II, multi-site, randomized, open-label, three-arm crossover study. 
+Note that although data was collected from various places, we assume no site specific differences.
+
+180 MATIK patients were recruited from various health care facilities, including hospitals, primary care clinics, and community-based health services. Patients were randomized into one of six regimen sequences, where each sequence consists of three 4 week periods of study product administration followed by at least a one-week washout period. There duration of this administration period, including the two washout period, was approximately 15 weeks.
+
+
+## Primary:
+
+Compare the safety and adherence profiles of Pill A, Gel B, and Gel C. Basically:
+1. whether medications are safe for patients
+2. whether patients could easily adhere to medication schedules so long term use is feasible
+
+
+## Secondary:
+
+Preliminary assessment and comparison of system and local Pharmacokinetics (PK) of Pill A, Gel B, and Gel C. Additionally:
+1. assess the correlation of PK with adherence measures and occurence of adverse events
+2. identify demographic factors associated with product adherence and whether they differ by product (Pill or Gel) or regimen (3xs per day or 1x per day)
+
