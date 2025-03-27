@@ -10,6 +10,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(ggplot2)
+library(DescTools)
+
+library(flexsurv)
+library(survival)
+library(MASS)
+library(survminer)
 ```
 
 
@@ -25,7 +31,10 @@ menopause <- menopause_dat %>%
          menopause = V4,
          race = V5,
          education = V6) %>%
-  mutate(menopause_time = menopause_age - intake_age)
+  mutate(menopause_time = menopause_age - intake_age,
+         race = as.factor(race),
+         education = as.factor(education),
+         menopause = as.integer(menopause)) 
 
 
 #description of variables:
@@ -48,7 +57,7 @@ menopause <- menopause_dat %>%
 
 #Part A
 
-##1A. Estimate median menopause time for all subjects, disregarding covariates. 
+##IA. Estimate median menopause time for all subjects, disregarding covariates. 
 
 note: suppose that menopause time distribution is approx. exponential. 
 
@@ -67,13 +76,167 @@ median(menopause$menopause_time)
 
 4.0424
 
+#computing CI:
+```{r}
+MedianCI(menopause$menopause_time, conf.level = 0.95)
+```
+
+  median   lwr.ci   upr.ci 
+4.042437 3.874059 4.254620 
+attr(,"conf.level")
+[1] 0.954713
+
+
+
+actual estimation of menopause time:
+```{r}
+lambda_hat <- 1 / (sum(menopause$menopause_time)/sum(menopause$menopause==1))  # MLE for exponential rate
+median_exp <- log(2) / lambda_hat
+cat("Estimated Median (Exponential Model):", median_exp, "years.\n")
+```
+
+
+
+
+##IB. Nonparametric estimate of survival fn for menopause time (using KM)
+
+
+```{r}
+#KM survival fn
+
+km_mt <- survfit(Surv(menopause_time, menopause) ~ 1, data = menopause)
+
+
+#plotting K-M curve
+plot(km_mt, mark.time = TRUE, xlab = "Years", ylab = "Survival Probability",
+     main = "Menopause time K-M curve", cex.main = 1.5)
+
+#another plot possibility
+ggsurvplot(km_mt, data = menopause, conf.int = TRUE, 
+           ggtheme = theme_classic(), xlab="Time to Menopause (years)", 
+           ylab="Survival Probability")
+
+
+
+#plotting cumulative hazard fn
+plot(km_mt, fun = 'cumhaz')
+
+
+#estimating cumulative hazard rates
+cbind(km_mt$time, -log(km_mt$surv), cumsum(km_mt$n.event/km_mt$n.risk))
+#time , K-M estim, Nelson-Aalen Estimator
+#cumulative
+
+#surival rate @ given time, w CI
+summary(km_mt, time = c(0, 1, 2, 3, 4, 5))
+#note: n.event is the cumulative num of events since prev time
+
+summary(km_mt, censored = TRUE)
+#not specifying time, n.event = # event @ each time point
+
+
+#somehow median surival time according to km-curve is not outputting
+print(km_mt)
+```
+
+
+```{r}
+#table of estimates for km curve
+km_table <- data.frame(time = km_mt$time,
+                  n.risk = km_mt$n.risk,
+                  n.event = km_mt$n.event,
+                  n.censor = km_mt$n.censor,
+                  surv = km_mt$surv,
+                  upper = km_mt$upper,
+                  lower = km_mt$lower)
+
+print(km_table)
+```
+
+possibly add slide with survival function?
+
+
+II. 
+
+fitting cox model.
+
+```{r}
+cox_model <- coxph(Surv(menopause_time, menopause) ~ race + education + intake_age, data = menopause)
+
+
+summary(cox_model)
+
+cox_model2 <- coxph(Surv(menopause_time, menopause) ~ intake_age, data = menopause)
+
+
+anova(cox_model, cox_model2) #doesnt matter whether include or not. #for better interpretation include race + education #actually big model is better
+```
+
+checking assumptions: assume proportion is constant overtime
+
+
+The Schoenfeld residuals are calculated for all covariates for each individual experiencing an event at a given time. Those are the differences between that individual's covariate values at the event time and the corresponding risk-weighted average of covariate values among all those then at risk. The word "residual" thus makes sense, as it's the difference between an observed covariate value and what you might have expected based on all those at risk at that time.
+
+```{r}
+# Check the proportional hazards assumption
+cox.zph_test = cox.zph(cox_model)
+
+# Plot Schoenfeld residuals to visualize proportional hazards assumption
+ggcoxzph(cox.zph_test)
+
+```
 
 
 
 
 
+III. 
+
+exponential distribution: 
+```{r}
+lambda_hat <- 1 / (sum(menopause$menopause_age)/sum(menopause$menopause==1))  # MLE for exponential rate
+median_exp <- log(2) / lambda_hat
+cat("Estimated Median (Exponential Model):", median_exp, "years.\n")
+
+#not realistic and KM-estimator is better outcome. 
+```
+
+S(t) = same as before
+
+```{r}
+km_fit_age <- survfit(Surv(intake_age, menopause_age, menopause) ~ 1, data = menopause)
+```
+
+```{r}
+km_age_table <- data.frame(age = km_fit_age$time,
+                           n.risk = km_fit_age$n.risk,
+                           n.event = km_fit_age$n.event,
+                           n.censor = km_fit_age$n.censor,
+                           survival = km_fit_age$surv, 
+                           lower = km_fit_age$lower, 
+                           upper = km_fit_age$upper)
+
+print(km_age_table)
+```
+
+```{r}
+cat("Estimated median menopause age (Kaplan-Meier):", summary(km_fit_age)$table["median"], "years.\n")
+```
+
+survfit2
+ggsurvfit
 
 
 
 
+146.98 232.98
+
+
+```{r}
+cox_model_age <- coxph(Surv(menopause_age, menopause) ~ race + education, data = menopause)
+
+cox.zph_test = cox.zph(cox_model_age)
+
+ggcoxzph(cox.zph_test)
+```
 
