@@ -7,6 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
 
 # Study Design / Objectives:
@@ -31,4 +32,14 @@ Compare the safety and adherence profiles of Pill A, Gel B, and Gel C. Basically
 Preliminary assessment and comparison of system and local Pharmacokinetics (PK) of Pill A, Gel B, and Gel C. Additionally:
 1. assess the correlation of PK with adherence measures and occurence of adverse events
 2. identify demographic factors associated with product adherence and whether they differ by product (Pill or Gel) or regimen (3xs per day or 1x per day)
+
+
+
+# Loading Data
+
+```{r}
+baseline <- read_csv("Project 3 - Cross Over/baseline.csv")
+endpoints <- read_csv("Project 3 - Cross Over/endpoints.csv")
+```
+
 
