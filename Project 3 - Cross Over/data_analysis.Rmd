@@ -38,8 +38,39 @@ Preliminary assessment and comparison of system and local Pharmacokinetics (PK) 
 # Loading Data
 
 ```{r}
-baseline <- read_csv("Project 3 - Cross Over/baseline.csv")
+baseline <- read_csv("Project 3 - Cross Over/baseline.csv") %>%
+  mutate(age = as.numeric(age))
+
 endpoints <- read_csv("Project 3 - Cross Over/endpoints.csv")
 ```
+
+
+# Exploratory Analysis
+
+```{r}
+mean(baseline$age) #31.93
+
+baseline %>%
+  group_by(race) %>%
+  count() #black (64), others (64), white (52)
+
+baseline %>%
+  group_by(gender) %>%
+  count() #0 (99), 1 (81)
+```
+
+
+important data stuff:
+
+bviral - viral load in blood plasma and affected tissue @ beginning of period
+
+sviral - '' @ end of period
+
+periods consist of: 1, washout, 2, washout, 3, follow-up
+
+
+ae_ - # of adverse events for specific medication during specific week
+
+adhere_ - # of days patients took specific medication during specific week
 
 
