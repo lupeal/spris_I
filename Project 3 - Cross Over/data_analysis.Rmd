@@ -38,8 +38,7 @@ Preliminary assessment and comparison of system and local Pharmacokinetics (PK) 
 # Loading Data
 
 ```{r}
-baseline <- read_csv("Project 3 - Cross Over/baseline.csv") %>%
-  mutate(age = as.numeric(age))
+baseline <- read_csv("Project 3 - Cross Over/baseline.csv")
 
 endpoints <- read_csv("Project 3 - Cross Over/endpoints.csv")
 ```
@@ -66,7 +65,7 @@ bviral - viral load in blood plasma and affected tissue @ beginning of period
 
 sviral - '' @ end of period
 
-periods consist of: 1, washout, 2, washout, 3, follow-up
+3 periods consist of: 1, washout, 2, washout, 3, follow-up
 
 
 ae_ - # of adverse events for specific medication during specific week
@@ -114,6 +113,38 @@ endpts <- endpts %>%
 
 ```
 
+```{r}
+baseline_long <- baseline %>%
+  mutate(age = as.numeric(age),
+         ptid = as.factor(ptid),
+         seq = paste0(substr(period1, nchar(period1), nchar(period1)),
+                      substr(period2, nchar(period2), nchar(period2)),
+                      substr(period3, nchar(period3), nchar(period3))),
+         seq2 = case_when(period3 == 'Gel C' ~ 0,
+                          period3 == 'Gel B' ~ 1,
+                          period3 == 'Pill A' ~ 2),
+         #blood virals diff for each period
+         b1 = bviral1 - bviral0,
+         b2 = bviral3 - bviral2,
+         b3 = bviral5 - bviral4,
+         b4 = bviral6,
+         #skin virals diff for each period
+         s1 = sviral1 - sviral0,
+         s2 = sviral3 - sviral2,
+         s3 = sviral5 - sviral4,
+         s4 = sviral6) %>%
+  select(ptid, seq, seq2, age, race, gender, b1:b4, s1:s4) %>%
+  pivot_longer(cols = b1:s4,
+               names_to = 'index',
+               values_to = 'viral') %>%
+  mutate(period = substr(index, 2, 2),
+         index = ifelse(substr(index, 1, 1) == 'b', 'bviral', 'sviral'))
+
+
+baseline_wide <- baseline_long %>%
+  pivot_wider(names_from = index,
+              values_from = viral)
+```
 
 
 carryover effect: use seq 2 to fit LMM model then test. 
