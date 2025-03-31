@@ -74,3 +74,46 @@ ae_ - # of adverse events for specific medication during specific week
 adhere_ - # of days patients took specific medication during specific week
 
 
+
+# Organizing Data
+
+```{r}
+data <- baseline %>%
+  pivot_longer(cols = starts_with('period'),
+               names_to = 'period', 
+               values_to = 'treatment')
+
+AE_endpts <- endpoints %>%
+  pivot_longer(cols = starts_with('AE'),
+               names_to = c('trt', 'week'),
+               names_pattern = 'AE_(.*?)_(week\\d+)',
+               values_to = 'AE')
+
+
+Adhere_endpts <- endpoints %>%
+  pivot_longer(cols = starts_with('Adhere'),
+               names_to = c('trt', 'week'),
+               names_pattern = 'Adhere_(.*?)_(week\\d+)',
+               values_to = 'Adhere')
+
+
+endpts <- left_join(AE_endpts, Adhere_endpts,
+                    by = c('ptid', 'period1', 'period2', 'period3', 'trt', 'week'))
+
+
+endpts <- endpts %>%
+  pivot_longer(cols = starts_with('period'),
+               names_to = 'period',
+               values_to = 'treatment') 
+
+
+
+endpts <- endpts %>%
+  select(ptid, period, treatment, week, AE, Adhere)
+
+
+```
+
+
+
+carryover effect: use seq 2 to fit LMM model then test. 
