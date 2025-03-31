@@ -76,7 +76,7 @@ adhere_ - # of days patients took specific medication during specific week
 
 # Organizing Data
 
-```{r}
+```{r, previous attempt, eval = FALSE}
 data <- baseline %>%
   pivot_longer(cols = starts_with('period'),
                names_to = 'period', 
@@ -113,7 +113,7 @@ endpts <- endpts %>%
 
 ```
 
-```{r}
+```{r, baseline data}
 baseline_long <- baseline %>%
   mutate(age = as.numeric(age),
          ptid = as.factor(ptid),
@@ -145,6 +145,46 @@ baseline_wide <- baseline_long %>%
   pivot_wider(names_from = index,
               values_from = viral)
 ```
+
+
+```{r, endpoints data}
+endpts_long <- endpoints %>%
+  mutate(ptid = as.factor(ptid),
+         seq = paste0(substr(period1, nchar(period1), nchar(period1)),
+                      substr(period2, nchar(period2), nchar(period2)),
+                      substr(period3, nchar(period3), nchar(period3))),
+         seq2 = case_when(period3 == 'Gel C' ~ 0,
+                          period3 == 'Gel B' ~ 1,
+                          period3 == 'Pill A' ~ 2)) %>%
+  pivot_longer(AE_pillA_week1:Adhere_gelC_week4,
+               names_to = 'index',
+               values_to = 'value') %>%
+  select(ptid, seq, seq2, index, value) %>%
+  mutate(week = substr(index, nchar(index), nchar(index)),
+         treatment = str_sub(index, -7, -7),
+         period = str_locate(seq, str_sub(index, -7, -7))[, 'start'],
+         index = str_sub(index, 1, 2))
+
+endpts_wide <- endpts_long %>%
+  pivot_wider(names_from = index,
+              values_from = value)
+```
+
+
+```{r, full data}
+data <- merge(endpts_wide, baseline_wide, by = c('ptid', 'seq', 'seq2', 'period')) %>%
+  mutate(ptid = as.factor(ptid),
+         period = as.factor(period),
+         week = as.factor(week),
+         seq = as.factor(seq),
+         seq2 = as.factor(seq2))
+
+#something to note is that PK's of 'period 4' are not included in this df. 
+```
+
+
+
+
 
 
 carryover effect: use seq 2 to fit LMM model then test. 
