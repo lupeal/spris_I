@@ -183,6 +183,38 @@ data <- merge(endpts_wide, baseline_wide, by = c('ptid', 'seq', 'seq2', 'period'
 ```
 
 
+# Exploratory Analysis Pt 2.
+
+```{r, AE}
+# of AEs overtime
+data %>%
+  group_by(week, treatment) %>%
+  summarise(sum_ae = sum(AE)) %>%
+  ggplot(aes(x = week, y = sum_ae, col = treatment)) +
+  geom_point() +
+  geom_line(aes(group = treatment)) +
+  xlab('Week') + 
+  ylab('# of grade 2 or higher adverse events') +
+  theme_classic() +
+  scale_color_brewer(palette="Set1")
+
+#see non-linear trends
+```
+
+
+```{r, Adherence}
+data %>%
+  group_by(week, treatment) %>%
+  summarise(sum_ad = sum(Ad)) %>%
+  ggplot(aes(x = week, y = sum_ad, col = treatment)) +
+  geom_point() +
+  geom_line(aes(group = treatment)) +
+  xlab('Week') +
+  ylab('# of adherence days') +
+  theme_classic()
+
+#sorta linear trends
+```
 
 
 
