@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(lme4)
 library(nlme)
+library(glmmTMB)
 ```
 
 # Study Design / Objectives:
@@ -250,11 +251,53 @@ data %>%
 # Primary Objective:
 
 ## AE:
-```{r, AE model}
+```{r, AE model 1, eval=FALSE}
 ae_m1 <- glmer(AE ~ age + race + gender + (period | ptid) + treatment + seq2,
                data = data,
                family = 'binomial')
 ```
+
+```{r, AE data}
+#creating AE response as binary
+
+ae_binary <- data %>%
+  #week as continuous
+  mutate(week = as.numeric(week),
+         #if 1 or more adverse events in a week, yes
+         AE = ifelse(AE>=1, 1, 0))
+
+#fitting a Generalized/Logistic Mixed Effects model:
+ae_weekM <- glmer(AE ~ treatment + period + week + base_bviral + base_sviral + (1 | ptid),
+                  data = ae_binary, family = binomial())
+
+summary(ae_weekM)
+#week is significant (only one too); 0.3544
+#AIC = 447.3
+#model failed to convg. 
+
+
+
+#comparing outcome to glmmTMB mod
+ae_weekM2 <- glmmTMB(AE ~ treatment + period + week + base_bviral + base_sviral + (1 | ptid),
+                     data = ae_binary, family = binomial())
+
+summary(ae_weekM2)
+#week is significant (only one too); 0.3546
+#AIC = 447.3
+#THIS MOD seems to be better
+```
+
+```{r}
+#AE still binary
+
+ae_binary_cat <- data %>%
+  #week as categorical
+  mutate(AE = ifelse(AE>=1, 1, 0)) 
+
+#
+```
+
+
 
 
 ## Adherence:
