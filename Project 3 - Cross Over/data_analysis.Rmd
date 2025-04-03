@@ -459,4 +459,14 @@ summary(ad_nobaseM2)
 #AIC = 4032.2 -- BEST MOD
 ```
 
+```{r, final AD mod}
+ad_nobaseM2 <- glmmTMB(cbind(7-Ad, Ad) ~ treatment + period + week + (1 | ptid),
+                       ziformula = ~ 1, 
+                       data = ad_wcont, family = binomial())
 
+summary(ad_nobaseM2)
+#trt, week signif
+#AIC = 4032.2 -- BEST MOD
+```
+
+Adherence final model has week as continuous, no `base_` covariates, and accounts for zero inflation since when looking through the data many patients did adhere so 7-Ad will produce many zeros.
