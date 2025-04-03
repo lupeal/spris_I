@@ -257,8 +257,9 @@ ae_m1 <- glmer(AE ~ age + race + gender + (period | ptid) + treatment + seq2,
                family = 'binomial')
 ```
 
-```{r, AE data}
+```{r, AE data + week continuous mods}
 #creating AE response as binary
+#WEEK CONTINUOUS
 
 ae_binary <- data %>%
   #week as continuous
@@ -287,16 +288,67 @@ summary(ae_weekM2)
 #THIS MOD seems to be better
 ```
 
-```{r}
+```{r, AE data + week categorical mods}
 #AE still binary
+#WEEK CATEGORICAL
 
 ae_binary_cat <- data %>%
   #week as categorical
   mutate(AE = ifelse(AE>=1, 1, 0)) 
 
-#
+#fitting Logistic ME model:
+ae_week_catM <- glmer(AE ~ treatment + period + week + base_bviral + base_sviral + (1 | ptid),
+                      data = ae_binary_cat, family = binomial())
+
+summary(ae_week_catM)
+#week 4 only significant; 0.8924
+#AIC = 451.7
+#model failed to convg.
+
+
+
+#comparing to glmmTMB mod
+ae_week_catM2 <- glmmTMB(AE ~ treatment + period + week + base_bviral + base_sviral + (1 | ptid),
+                         data = ae_binary_cat, family = binomial())
+
+summary(ae_week_catM2)
+#week 4 only significant; 1.0853
+#AIC = 451.1
 ```
 
+```{r, AE mods without week covariate}
+ae_noweekM <- glmer(AE ~ treatment + period + base_bviral + base_sviral + (1 | ptid),
+                    data = ae_binary_cat, family = binomial())
+summary(ae_noweekM)
+#nothing significant
+#AIC = 452
+#model failed to converge
+
+
+
+ae_noweekM2 <- glmmTMB(AE ~ treatment + period + base_bviral + base_sviral + (1 | ptid),
+                       data = ae_binary_cat, family = binomial())
+
+summary(ae_noweekM2)
+#nothing significant
+#AIC = 451.9
+```
+
+```{r, AE mods without base_ covariates + ANOVA}
+#WEEK CONTINUOUS, NO base covariates
+ae_nobaseM <- glmmTMB(AE ~ treatment + period + week + (1 | ptid),
+                      data = ae_binary, family = binomial())
+
+
+#full vs reduced model:
+anova(ae_weekM2, ae_nobaseM)
+#null: reduced model is better
+#alt: extra covariates improve model fit
+#alpha = 0.05, fail to reject null -- reduced model is ok.
+```
+
+Overall, model with week as continuous produces best AIC. Also using `glmmTMB`.
+The final model will have week as continuous and not contain the `base_` covariates.
 
 
 
