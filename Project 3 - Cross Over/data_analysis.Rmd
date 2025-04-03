@@ -8,6 +8,8 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(lme4)
+library(nlme)
 ```
 
 # Study Design / Objectives:
@@ -127,18 +129,41 @@ baseline_long <- baseline %>%
          b1 = bviral1 - bviral0,
          b2 = bviral3 - bviral2,
          b3 = bviral5 - bviral4,
-         b4 = bviral6,
+         follow_b = bviral6 - bviral5,
          #skin virals diff for each period
          s1 = sviral1 - sviral0,
          s2 = sviral3 - sviral2,
          s3 = sviral5 - sviral4,
-         s4 = sviral6) %>%
-  select(ptid, seq, seq2, age, race, gender, b1:b4, s1:s4) %>%
-  pivot_longer(cols = b1:s4,
+         follow_s = sviral6 - sviral5,
+         #viral @ beginning of period
+         ini_b1 = bviral0,
+         ini_b2 = bviral2,
+         ini_b3 = bviral4,
+         ini_s1 = sviral0,
+         ini_s2 = sviral2,
+         ini_s3 = sviral4,
+         #viral @ end of period
+         end_b1 = bviral1,
+         end_b2 = bviral3,
+         end_b3 = bviral5,
+         end_s1 = sviral1,
+         end_s2 = sviral3,
+         end_s3 = sviral5) %>%
+  select(ptid, seq, seq2, age, race, gender, b1:b3, s1:s3,
+         ini_b1:ini_s3, end_b1:end_s3, follow_b, follow_s) %>%
+  pivot_longer(cols = b1:end_s3,
                names_to = 'index',
                values_to = 'viral') %>%
-  mutate(period = substr(index, 2, 2),
-         index = ifelse(substr(index, 1, 1) == 'b', 'bviral', 'sviral'))
+  mutate(period = substr(index, nchar(index), nchar(index)),
+         #index = ifelse(substr(index, 1, 1) == 'b', 'bviral', 'sviral')
+         index = case_when(
+           substr(index,1,1)=="b" ~ "dif_bviral",
+           substr(index,1,1)=="s" ~ "dif_sviral",
+           substr(index,1,5)=="ini_b" ~ "base_bviral",
+           substr(index,1,5)=="ini_s" ~ "base_sviral",
+           substr(index,1,5)=="end_b" ~ "end_bviral",
+           substr(index,1,5)=="end_s" ~ "end_sviral"
+         ))
 
 
 baseline_wide <- baseline_long %>%
@@ -167,7 +192,12 @@ endpts_long <- endpoints %>%
 
 endpts_wide <- endpts_long %>%
   pivot_wider(names_from = index,
-              values_from = value)
+              values_from = value) %>%
+  #creating carryover variable
+  mutate(carryover = case_when(
+    period == 1 ~ NA,
+    period == 2 ~ substr(seq, 1, 1),
+    period == 3 ~ substr(seq, 2, 2)))
 ```
 
 
@@ -216,6 +246,24 @@ data %>%
 #sorta linear trends
 ```
 
+
+# Primary Objective:
+
+## AE:
+```{r, AE model}
+ae_m1 <- glmer(AE ~ age + race + gender + (period | ptid) + treatment + seq2,
+               data = data,
+               family = 'binomial')
+```
+
+
+## Adherence:
+```{r}
+ad_m1 <- lme(Ad ~ age + race + gender + treatment + seq2,
+             random = ~ 1 | ptid,
+             data = data,
+             method = 'ML')
+```
 
 
 
