@@ -250,6 +250,8 @@ data %>%
 
 # Primary Objective:
 
+carryover effect: use seq 2 to fit LMM model then test. 
+
 ## AE:
 ```{r, AE model 1, eval=FALSE}
 ae_m1 <- glmer(AE ~ age + race + gender + (period | ptid) + treatment + seq2,
@@ -345,6 +347,11 @@ anova(ae_weekM2, ae_nobaseM)
 #null: reduced model is better
 #alt: extra covariates improve model fit
 #alpha = 0.05, fail to reject null -- reduced model is ok.
+
+
+summary(ae_nobaseM)
+#week is only significant
+#AIC = 446
 ```
 
 Overall, model with week as continuous produces best AIC. Also using `glmmTMB`.
@@ -353,13 +360,103 @@ The final model will have week as continuous and not contain the `base_` covaria
 
 
 ## Adherence:
-```{r}
+```{r, previous AD mod, eval=FALSE}
 ad_m1 <- lme(Ad ~ age + race + gender + treatment + seq2,
              random = ~ 1 | ptid,
              data = data,
              method = 'ML')
 ```
 
+```{r, BLME mod; week continuous}
+#creating AD response Binomial(7, p)
+#since each day is adhere (yes or no), so sum up # of days able to adhere
+#WEEK CONTINUOUS -- bc of linear trends
+
+ad_wcont <- data %>%
+  mutate(week = as.numeric(week))
+
+#fitting a Binomial Linear Mixed Effects model:
+#but fitting for 7 - AD, which means number of days patient didn't adhere
+ad_weekM <- glmmTMB(cbind(7-Ad, Ad) ~ treatment + period + week +
+                      base_bviral + base_sviral + (1 | ptid),
+                    data = ad_wcont, family = binomial())
+
+summary(ad_weekM)
+#treatment, week significant
+#AIC = 4031.2
+```
+
+```{r, BLME mod; week categorical}
+ad_week_catM <- glmmTMB(cbind(7-Ad, Ad) ~ treatment + period + week +
+                          base_bviral + base_sviral + (1 | ptid),
+                        data = data, family = binomial())
+
+summary(ad_week_catM)
+#trt, week significant
+#AIC = 4033.1
+```
+
+```{r, BLME mod; no week}
+ad_noweekM <- glmmTMB(cbind(7-Ad, Ad) ~ treatment + period + base_bviral +
+                        base_sviral + (1 | ptid),
+                      data = data, family = binomial())
+
+summary(ad_noweekM)
+#trt significant
+#AIC = 4189.3
+```
+
+```{r, BLME without base_ covariates + ANOVA}
+#WEEK CONTINUOUS; no base_
+ad_nobaseM <- glmmTMB(cbind(7-Ad, Ad) ~ treatment + period + week + (1 | ptid),
+                      data = ad_wcont, family = binomial())
+
+summary(ad_nobaseM)
+#treatment, week significant
+#AIC = 4030.2
+#lower AIC this mod is better
+```
 
 
-carryover effect: use seq 2 to fit LMM model then test. 
+```{r, BLME mods w zero-inflation}
+#modeling all above but with zero-inflation:
+ad_weekM2 <- glmmTMB(cbind(7-Ad, Ad) ~ treatment + period + week +
+                      base_bviral + base_sviral + (1 | ptid),
+                     ziformula = ~1,
+                     data = ad_wcont, family = binomial())
+
+summary(ad_weekM2)
+#trt, week signif
+#AIC = 4033.2
+
+
+ad_week_catM2 <- glmmTMB(cbind(7-Ad, Ad) ~ treatment + period + week +
+                          base_bviral + base_sviral + (1 | ptid),
+                         ziformula = ~1,
+                         data = data, family = binomial())
+
+summary(ad_week_catM2)
+#trt, week signif
+#AIC = 4035.1
+
+
+ad_noweekM2 <- glmmTMB(cbind(7-Ad, Ad) ~ treatment + period + base_bviral +
+                        base_sviral + (1 | ptid),
+                       ziformula = ~1,
+                       data = data, family = binomial())
+
+summary(ad_noweekM2)
+#trt signif
+#AIC = 4191.3 -- should include week
+
+
+ad_nobaseM2 <- glmmTMB(cbind(7-Ad, Ad) ~ treatment + period + week + (1 | ptid),
+                       ziformula = ~ 1, 
+                       data = ad_wcont, family = binomial())
+
+summary(ad_nobaseM2)
+#trt, week signif
+#AIC = 4032.2 -- BEST MOD
+```
+
+
