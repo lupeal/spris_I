@@ -1,0 +1,34 @@
+---
+title: "data analysis"
+author: "Lupe Antonio"
+date: "2025-04-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+```
+
+# Background
+
+
+
+# A
+
+Write statistical analysis plan, includes (1) randomization procedure, (2) analytic approach for primary analysis, (3) sample size calculation.
+
+
+
+
+# B
+
+```{r}
+#loading data:
+
+demographics <- read_xlsx("Project 4/Q2b_BL.xlsx")
+
+followup <- read_xlsx("Project 4/Q2b.xlsx")
+```
+
