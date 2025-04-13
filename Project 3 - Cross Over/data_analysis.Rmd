@@ -232,6 +232,20 @@ data %>%
 #see non-linear trends
 ```
 
+```{r, week continuous}
+data %>%
+  mutate(week = as.numeric(week)) %>%
+  group_by(week, treatment) %>%
+  summarise(sum_ae = sum(AE)) %>%
+  ggplot(aes(x = week, y = sum_ae, col = treatment)) +
+  geom_point() +
+  geom_line(aes(group = treatment)) +
+  xlab('Week') + 
+  ylab('# of grade 2 or higher adverse events') +
+  theme_classic() +
+  scale_color_brewer(palette="Set1")
+```
+
 
 ```{r, Adherence}
 data %>%
@@ -245,6 +259,19 @@ data %>%
   theme_classic()
 
 #sorta linear trends
+```
+
+```{r, week continuous}
+data %>%
+  mutate(week = as.numeric(week)) %>%
+  group_by(week, treatment) %>%
+  summarise(sum_ad = sum(Ad)) %>%
+  ggplot(aes(x = week, y = sum_ad, col = treatment)) +
+  geom_point() +
+  geom_line(aes(group = treatment)) +
+  xlab('Week') +
+  ylab('# of adherence days') +
+  theme_classic()
 ```
 
 
@@ -408,7 +435,7 @@ summary(ad_noweekM)
 
 ```{r, BLME without base_ covariates + ANOVA}
 #WEEK CONTINUOUS; no base_
-ad_nobaseM <- glmmTMB(cbind(7-Ad, Ad) ~ treatment + period + week + (1 | ptid),
+ad_nobaseM <- glmmTMB(cbind(Ad, 7-Ad) ~ treatment + period + week + (1 | ptid),
                       data = ad_wcont, family = binomial())
 
 summary(ad_nobaseM)
@@ -469,4 +496,34 @@ summary(ad_nobaseM2)
 #AIC = 4032.2 -- BEST MOD
 ```
 
-Adherence final model has week as continuous, no `base_` covariates, and accounts for zero inflation since when looking through the data many patients did adhere so 7-Ad will produce many zeros.
+Adherence final model has week as continuous, no `base_` covariates, and does not account for zero inflation since when looking through the data many patients did adhere so 7-Ad will produce many zeros -- but actually wasn't significant.
+
+
+
+
+# Secondary Objective
+
+
+## Demographic Factors * product / regimen
+```{r}
+#demographic data
+dem_data = data %>%
+  mutate(product = case_when(
+      treatment == "A" ~ 'pill',
+      .default = 'gel'),
+    regimen = case_when(
+      treatment == "B" ~ '3',
+      .default = '1'))
+
+#age significant only, so age*prod + age*regimen:
+
+
+dem_data2 <- dem_data %>%
+  mutate(week = as.numeric(week))
+
+dem_ad <- glmmTMB(cbind(Ad, 7-Ad) ~ age*product + age*regimen + period + week + (1 | ptid),
+                  data = dem_data2, family = binomial())
+
+summary(dem_ad)
+```
+
