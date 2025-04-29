@@ -9,6 +9,13 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
+library(lme4)
+library(naniar)
+library(mice)
+library(gtsummary)
+library(ggplot2)
+library(corrplot)
+library(rstpm2)
 ```
 
 # Background
@@ -19,6 +26,7 @@ library(readxl)
 
 Write statistical analysis plan, includes (1) randomization procedure, (2) analytic approach for primary analysis, (3) sample size calculation.
 
+- Relative risk: [ppl got sick & vaccine/ppl got vaccine] / [ppl got sick & no vaccine/ppl no vaccine]
 
 
 
@@ -30,5 +38,437 @@ Write statistical analysis plan, includes (1) randomization procedure, (2) analy
 demographics <- read_xlsx("Project 4/Q2b_BL.xlsx")
 
 followup <- read_xlsx("Project 4/Q2b.xlsx")
+```
+
+## Objective: 
+
+Determine whether the vaccine group has greater odds of having severe adverse effects (SAE) at any of the three assessment time points.
+
+
+SAE - binary
+
+"SAE was defined as any untoward medical occurrence that was life-threatening or required inpatient hospitalization."
+
+```{r}
+#data cleaning + merging
+
+followup_wide <- followup %>%
+  pivot_wider(names_from = TIME,
+              values_from = SAE)
+
+
+data_wide <- merge(demographics, followup_wide, by = 'ID') %>%
+  mutate(SITE = as.factor(SITE),
+         SEX = as.factor(SEX),
+         )
+  
+
+#final:
+data <- data_wide %>%
+  pivot_longer(cols = '1':'3',
+               names_to = 'TIME',
+               values_to = 'SAE') %>%
+  mutate(SITE = as.factor(SITE),
+         SEX = as.factor(SEX),
+         TIME = as.factor(TIME),
+         SAE = as.factor(SAE),
+         GROUP = as.factor(GROUP))
+
+#12298 SAE NA's
+```
+
+
+```{r, table 1}
+data %>%
+  distinct(ID, .keep_all = TRUE) %>%
+  select(-ID, -missing) %>%
+  #mutate(
+  #  Gender = case_when(Gender == 'M' ~ 'Male',
+  #                     Gender == 'F' ~ 'Female'),
+  #  
+  #  Treatment_Group = case_when(Treatment_Group == 'A' ~ 'Placebo',
+  #                              Treatment_Group == 'B' ~ 'Low dose',
+  #                              Treatment_Group == 'C' ~ 'High dose')) %>%
+  tbl_summary(by = GROUP,
+              statistic = list(all_continuous() ~ '{mean}({sd})',
+                               all_categorical() ~ '{n} ({p}%)'),
+              digits = all_continuous() ~ 3,
+              label = list(GROUP ~ 'Group')) %>%
+  #modify_spanning_header(c('stat_1', 'stat_2', 'stat_3') ~ '**Day**') %>%
+  modify_header(label = '**Variable**') %>%
+  bold_labels() %>%
+  modify_caption('Table 1. Summary statistics')
+```
+
+
+```{r}
+data %>%
+  distinct(ID, .keep_all = TRUE) %>%
+  filter(GROUP == 0 & TIME == 1) %>%
+  drop_na()
+
+data %>%
+  filter(GROUP == 0 & TIME == 2) %>%
+  distinct(ID, .keep_all = TRUE) %>%
+  drop_na()
+```
+
+
+```{r}
+ggplot(data = data, aes(x = as.factor(missing))) +
+  geom_bar()
+```
+
+
+```{r, checking multicollinearity}
+cor_data <- data_wide %>%
+  select(-ID, -SITE) %>%
+  mutate(SEX = as.numeric(SEX))
+#%>%
+ # mutate(GROUP = as.factor(GROUP))
+
+corrplot(cor(cor_data, use='complete.obs'), addCoef.col = "red", type = "upper",tl.col="black", tl.srt=20)
+```
+
+
+```{r, Little's Test}
+mcar_test(data)
+
+#H_0: data MCAR (missing completely at random)
+
+#high chi-squared stat & low pval == reject null, not MCAR
+```
+
+
+```{r, checking MAR}
+data <- data %>%
+  mutate(missing = is.na(SAE),
+         missing = case_when(
+           missing == 'TRUE' ~ 1,
+           missing == 'FALSE' ~ 0))
+
+missing_mod <- glm(missing ~ GROUP + TIME + SEX + AGE + SITE,
+                   data = data,
+                   family = 'binomial')
+
+summary(missing_mod)
+
+#group, time seem to predict missingness well. (missingness predicted from obs data)
+#suggests MAR
+#thus, logistic mixed effects mod is robust under MAR. no need to impute.
+```
+
+
+```{r}
+gg_miss_fct(data, fct = GROUP)
+
+vis_miss(data)
+```
+
+
+```{r}
+md.pattern(data)
+```
+
+
+
+```{r, eval = FALSE}
+mod1 <- glmer(SAE ~ GROUP + TIME + SITE + SEX + AGE + (1 | ID),
+              data = data,
+              family = 'binomial')
+
+
+summary(mod1)
+
+#not running; probs bc site has 100 levels
+```
+
+
+```{r, no interaction mod}
+mod2 <- glmer(SAE ~ GROUP + TIME + SEX + AGE + (1 | ID),
+              data = data,
+              family = 'binomial')
+
+summary(mod2)
+
+#AIC = 2615.2 (LOWER = BETTER)
+#time levels not signif.
+#age is only signif at .05
+```
+
+
+```{r, interaction group*time mod}
+mod3 <- glmer(SAE ~ GROUP*TIME + SEX + AGE + (1 | ID),
+              data = data,
+              family = 'binomial')
+
+summary(mod3)
+
+#AIC = 2617.8
+#age only signif at .05
+```
+
+
+```{r, final mod}
+mod4 <- glmer(SAE ~ GROUP*TIME + SEX + AGE + (1 | ID/SITE),
+              data = data,
+              family = 'binomial')
+
+summary(mod4)
+#AIC: 2619.8
+```
+
+```{r, normality of random effects}
+rand_effs <- ranef(mod4, condVar = TRUE)
+
+#plotting
+qqnorm(rand_effs$`SITE:ID`[[1]], main = 'Q-Q plot of RE (Patient within Site)')
+
+qqnorm(rand_effs$ID[[1]])
+```
+
+
+```{r}
+mod4_2 <- glmer(SAE ~ GROUP + TIME + SEX + AGE + (1 | ID/SITE),
+              data = data,
+              family = 'binomial')
+
+summary(mod4_2)
+
+anova(mod4, mod4_2)
+#null: no interaction model is better/reduced model better
+#fail to reject, then interaction is not significant,
+#thus, also supports that SAE odds to not change/vary by group or over time
+
+#this is the correct conclusion right
+```
+
+
+```{r}
+mod5 <- glmer(SAE ~ GROUP*TIME + SEX + AGE + (1 | SITE),
+              data = data,
+              family = 'binomial')
+
+summary(mod5)
+#random effect must be linear?
+#AIC: 2616.3
+
+rand_effs <- ranef(mod5, condVar = TRUE)
+
+qqnorm(rand_effs$SITE[[1]])
+```
+
+ID:SITE
+
+
+#pattern of missing; MAR -- use MIXED EFFECTS MODEL
+
+ANOVA - time points, non-signifc. interaction use,
+
+
+#consider sensitivity analysis:
+
+- compare completers vs non, to see if there is much of a difference?
+
+- or compare completers to all data models?
+
+which is best?
+
+glmmTMB(sae ~ time:group + time + sex + age + (1 | site/group),
+data,
+binomial,
+na.omit)
+
+
+
+# C
+
+Infection time - Enrollment time
+
+censor: lastFU whether it is larger than 12 months
+
+```{r}
+#loading data
+surv_dat <- read_xlsx("Project 4/Q2c.xlsx",
+                      col_types = c("numeric", "numeric", "numeric", "numeric", "logical"))
+```
+
+```{r}
+library(survival)
+
+surv_obj <- Surv(time = surv_dat$LastFUTime,
+                 event = surv_dat$Infection,
+                # type = 'right',
+                 origin = surv_dat$EnrollmentTime)
+
+
+km_fit <- survfit(surv_obj ~ 1, data = surv_dat)
+
+plot(km_fit, xlab = 'Time to Infection (days)', ylab = 'Survival Probability')
+```
+
+
+```{r}
+#calculating the prob of infection within 12 months:
+summary(km_fit, times = 365) #prob = 0.708
+
+#1-prob @ 365
+1 - 0.708 # 0.292
+
+#lower of prob:
+summary(km_fit, times = 365)$lower
+#0.685
+
+#upper of prob:
+summary(km_fit, times = 365)$upper
+#0.732
+
+#conf int:
+
+#lower:
+1 - 0.732
+#0.268
+
+#upper:
+1 - 0.685
+#0.315
+
+# 0.292 (0.268, 0.315)
+```
+
+```{r}
+#median time to infection
+summary(km_fit)$table['median']
+#doesn't reach halfway point
+```
+
+```{r}
+#mean time to infection
+summary(km_fit)$table
+
+summary(km_fit)$table['rmean']
+```
+
+
+```{r}
+#fitting on parametric models to find median time to infection
+
+#exponential distribution:
+exp_fit <- survreg(surv_obj ~ 1, data = surv_dat,
+                   dist = 'exponential')
+#median time to infection: 974.173
+
+
+#weibull distribution:
+weibull_fit <- survreg(surv_obj ~ 1, data = surv_dat,
+                       dist =  'weibull')
+#median time to infection: 453.668
+
+#log-normal distribution:
+logn_fit <- survreg(surv_obj ~ 1, data = surv_dat,
+                    dist = 'lognormal')
+#median time to infection: 457.345
+
+#to find median time to infection:
+predict(logn_fit, type = 'quantile', p = 0.5)
+```
+
+
+```{r, use for plotting parametric mods!}
+exp_fit2 <- flexsurvreg(surv_obj ~ 1, data = surv_dat,
+                        dist = 'exponential')
+
+weibull_fit2 <- flexsurvreg(surv_obj ~ 1, data = surv_dat,
+                        dist = 'weibull')
+
+logn_fit2 <- flexsurvreg(surv_obj ~ 1, data = surv_dat,
+                        dist = 'lognormal')
+
+
+#median time to infection:
+summary(exp_fit2, type = 'quantile', quantiles = 0.5) #same as before
+```
+
+
+
+```{r}
+#plotting parametric + km models:
+library(flexsurv)
+library(survminer)
+
+plot(km_fit, xlab = 'Time to Infection (days)', ylab = 'Survival Probability',
+     conf.int = FALSE, lwd = 2)
+
+
+#time grid:
+time_grid <- seq(0, max(surv_dat$LastFUTime, na.rm = TRUE), by = 1)
+
+plot(exp_fit2, col = 'blue', add = TRUE, t = time_grid, lwd = 2, ci = FALSE)
+plot(weibull_fit2, col = 'red', add = TRUE, t = time_grid, lwd = 2, ci = FALSE)
+plot(logn_fit2, col = 'green', add = TRUE, t = time_grid, lwd = 2, ci = FALSE)
+
+legend('bottomleft', legend = c('KM (nonparametric)', 'Exponential', 'Weibull', 'Log-Normal'),
+       col = c('black', 'blue', 'red', 'green'),
+       lty = c(1, 2, 3, 4, 5), lwd = 2, bty = 'n')
+```
+
+```{r, eval=FALSE}
+#exp survival fun:
+#S(t) = exp(-lambda*t), lambda = exp(rate param)
+
+#rate param:
+exp_lambda <- exp_fit$coefficients[1]
+#scale param:
+exp_scale <- exp(exp_lambda)
+#exp survival probs:
+exp_surv <- exp(-surv_dat$LastFUTime/exp_scale)
+
+#exp line:
+lines(surv_dat$LastFUTime, exp_surv, col = 'blue', lwd = 2)
+
+
+
+
+#exp line:
+
+exp_pred <- predict(exp_fit, type = 'response', newdata = data.frame(time = surv_dat$LastFUTime))
+#survival function:
+exp_surv <- exp(-exp_pred)
+lines(surv_dat$LastFUTime, exp_surv, col = 'blue')
+
+
+#weibull line:
+
+weibull_pred <- predict(weibull_fit, type = 'response', newdata = data.frame(time = surv_dat$LastFUTime))
+weibull_surv <- exp(-weibull_pred)
+lines(surv_dat$LastFUTime, weibull_surv, col = 'red')
+
+
+  
+  
+
+#time grid:
+time_grid <- seq(0, max(surv_dat$LastFUTime, na.rm = TRUE), by = 1)
+
+#extracting survival preds from models:
+exp_pred <- predict(exp_fit, type = 'survival', t = time_grid, newdata = data.frame(1))
+weibull_pred <- summary(weibull_fit, t = time_grid)
+logn_pred <- summary(logn_fit, t = time_grid)
+
+#extracting survival estimates:
+lines(time_grid, exp_pred, col = 'blue', ci = FALSE)
+lines(time_grid, weibull_pred[[1]]$est, col = 'red', ci = FALSE)
+lines(logn_fit, col = 'green', ci = FALSE)
+```
+
+
+```{r}
+#spline based model:
+spline_fit <- stpm2(Surv(EnrollmentTime, LastFUTime, Infection) ~ 1, data = surv_dat, df = 4)
+
+plot(km_fit, xlab = 'Time to Infection (days)', ylab = 'Survival Probability',
+     conf.int = FALSE, lwd = 2)
+
+plot(spline_fit, col = 'blue', add = TRUE, t = time_grid, lwd = 2)
 ```
 

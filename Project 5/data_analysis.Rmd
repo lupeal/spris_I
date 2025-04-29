@@ -1,0 +1,20 @@
+---
+title: "data_analysis"
+author: "Lupe Antonio"
+date: "2025-04-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+```
+
+#
+
+```{r}
+#loading data
+data <- read_xlsx("Project 5/Proj 5 data.xlsx")
+```
+
