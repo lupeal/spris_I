@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
+library(gtsummary)
 ```
 
 # Analysis of Asthma-PASS Intervention 
@@ -16,6 +17,12 @@ library(readxl)
 ```{r}
 #loading data
 data <- read_xlsx("Project 5/Proj 5 data.xlsx")
+
+#clean up
+data <- data %>%
+  mutate(time = as.factor(time),
+         group = as.factor(group),
+         school = as.factor(school))
 ```
 
 ## Background:
@@ -40,9 +47,93 @@ Asthmatic children were recruited from four Bronx elementary schools among 104 B
 
 A total of 108 children between the ages of 4-11 with physician-diagnosed persistent or uncontrolled asthma attending kindergarten to 5th grade (from the 4 schools selected) were recruited. The four elementary schools were randomly assigned to Asthma-Pass intervention group (2 schools) or AM comparison group (2 schools), where participants followed the routine provided by each school (the standard care). The particpants were followed at 6 and 12 months post baseline. 
 
-```{r}
-
+```{r, table 1}
+data %>%
+  distinct(ID, .keep_all = TRUE) %>%
+  select(-ID, -time) %>%
+  tbl_summary(by = group,
+              statistic = list(all_continuous() ~ '{mean}({sd})',
+                               all_categorical() ~ '{n} ({p}%)'),
+              digits = all_continuous() ~ 3,
+              label = list(group ~ 'Group')) %>%
+  modify_spanning_header(c('stat_1', 'stat_2') ~ '**Intervention Group**') %>%
+  modify_header(label = '**Variable**',
+                stat_1 = paste('**Control**, N = 49'),
+                stat_2 = paste('**Intervention**, N = 59')) %>%
+  bold_labels() %>%
+  modify_caption('Table 1. Summary statistics')
 ```
+
+
+```{r, vals for table 1}
+#values to modify table:
+
+#avg SFD at baseline,6,12 per group:
+data %>%
+  filter(time == 3) %>%
+  distinct(ID, .keep_all = TRUE) %>%
+  group_by(group) %>%
+  summarise(avg_sfd = mean(SFD, na.rm = TRUE)) 
+
+#0 (9.60), 1(8.95) @ t = 1
+#0 (11), 1(11.9) @ t = 2
+#0 (10.9), 1(11.6) @ t = 3
+
+#avg SFD per group at each time point:
+data %>%
+  group_by(group, time) %>%
+  summarise(avg_sfd = mean(SFD, na.rm = TRUE))
+
+#overall avg SFD per group
+data %>%
+  group_by(group) %>%
+  summarise(avg_sfd = mean(SFD, na.rm = TRUE))
+#0 (10.5), 1 (10.8)
+
+
+data %>%
+  filter(time == 3 & group == 1) %>%
+  distinct(ID, .keep_all = TRUE) %>%
+  drop_na()
+#n = 48 in control at time 1
+#n = 46 '' @ t = 2
+#n = 43 '' @ t = 3
+
+#n = 57 in interv at time 1
+#n = 52 '' @ t = 2
+#n = 50 '' @ t = 3
+
+
+#to see how many participants had at least one missing value of SFD at any time point:
+data %>%
+  group_by(ID) %>%
+  filter(any(is.na(SFD))) %>%
+  distinct(ID)
+
+# 1 1012_1 #group 1, time 2, 3
+# 2 1021_1 #group 1, time 1, 2, 3
+# 3 1026_1 #group 1, time 2, 3
+# 4 1027_1 #group 1, time 3
+# 5 1028_1 #group 1, time 3
+# 6 2011_1 #group 0, time 2, 3
+# 7 2015_1 #group 0, time 2
+# 8 3001_1 #group 1, time 2, 3
+# 9 3007_1 #group 1, time 1, 2, 3
+#10 3009_1 #group 1, time 3
+#11 3016_1 #group 1, time 2, 3
+#12 3023_1 #group 1, time 2
+#13 4009_1 #group 0, time 3
+#14 4011_1 #group 0, time 3
+#15 4012_1 #group 0, time 1, 2, 3
+#16 4025_1 #group 0, time 3
+#17 4026_1 #group 0, time 3
+
+#group 0; time 1=1, time 2=3, time 3=6
+#group 1; time 1=2, time 2=7, time 3=9
+
+#total of 17 ppl with missing values.
+```
+
 
 
 
