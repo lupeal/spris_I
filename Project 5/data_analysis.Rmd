@@ -135,5 +135,107 @@ data %>%
 ```
 
 
+```{r, not ideal plot}
+#SFDs over time by group:
+data %>% group_by(time, group) %>%
+  summarise(sum_sfd = sum(SFD, na.rm = TRUE)) %>%
+  ggplot(aes(x = time, y = sum_sfd, col = group)) +
+  geom_point() +
+  geom_line(aes(group = group)) +
+  xlab('Follow-Up Times') + 
+  ylab('# of symptom free days') + 
+  theme_classic()
+
+```
+
+```{r, avg SFD over time per group}
+sfd_data <- data %>%
+  group_by(group, time) %>%
+  summarise(avg_sfd = mean(SFD, na.rm = TRUE),
+            sd_sfd = sd(SFD, na.rm = TRUE),
+            n = sum(!is.na(SFD)),
+            se_sfd = sd_sfd/sqrt(n)) %>%
+  ungroup()
+
+ggplot(aes(x = time, y = avg_sfd, col = group, group = group), data = sfd_data) +
+  geom_point() + 
+  geom_line() +
+  xlab('Follow-up Times') + 
+  ylab('Average Number of SFDs (out of 14)') + 
+  theme_classic() +
+  scale_color_brewer(palette="Set1")
+```
+
+
+## Binomial Mixed Effects model:
+
+Justification: Our outcome of interest is SFD which has a max value of 14 days `max(data$SFD, na.rm = TRUE)`. We also have participant variation and school variation. 
+
+```{r}
+#SFD response ~ Binomial(14, p)
+#since each day yes or no have symptom, so sum up the # of symptom free days
+
+
+library(lme4)
+
+mod1 <- glmer(cbind(SFD, 14-SFD) ~ group*time + (1 | ID/school),
+              data = data,
+              family = 'binomial')
+
+summary(mod1)
+#AIC = 1896.3
+#time2, time3, g1:t2, g1:t3 are significant
+
+
+mod1_noint <- glmer(cbind(SFD, 14-SFD) ~ group + time + (1 | ID/school),
+                    data = data,
+                    family = 'binomial')
+
+summary(mod1_noint)
+#AIC = 1915.8
+#t2, t3 signf
+
+
+anova(mod1_noint, mod1)
+#null: no interaction model is better/reduced model better
+#reject null -- low p-val, model with interaction is significant.
+#interaction improves model fit
+```
+
+The interaction between time and group is significant. This indicates that the change in SFDs over time differs by group. Since the coefficients are positive (for interaction terms), we can conclude that the intervention group experienced greater improvement over time compared to the control group. Meaning, we see an increase in SFDs over time compared to the control group. 
+
+Coefficient interpretations:
+currently coefficients are log-odds of having a symptom free day
+
+time2: the control group improves from baseline to 6 months significantly.
+       The odds of SFDs at 6 months are about 1.99 more compared to baseline for the control group.
+       
+time3: The odds of SFDs at 12 months are about 1.87 higher compared to baseline for the control group.
+
+g1:t2: For those in the intervention group, the odds of SFDs at 6 months increases by 5.07 (1.99*2.55) compared to the control group at baseline?
+Meaning, those in the intervention group experienced much greater improvement in odds of SFDs at 6 months compared to the control group. 
+
+g1:t3: For those in the intervention group, the odds of SFDs at 12 months increases by 4.06 (1.87*2.17) compared to baselines.
+Meaning, similar to above. Significant improvement of SFDs over time.
+
+
+```{r, other option}
+library(glmmTMB) #supports zero-inflation, dispersion models
+
+mod2 <- glmmTMB(cbind(SFD, 14-SFD) ~ group*time + (1 | ID/school),
+                data = data,
+                family = 'binomial')
+
+summary(mod2)
+
+mod2_noint <- glmmTMB(cbind(SFD, 14-SFD) ~ group + time + (1 | ID/school),
+                      data = data,
+                      family = 'binomial')
+
+summary(mod2_noint)
+#AIC = 1915.8
+
+anova(mod2_noint, mod2)
+```
 
 
