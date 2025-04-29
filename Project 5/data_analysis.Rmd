@@ -200,6 +200,7 @@ anova(mod1_noint, mod1)
 #null: no interaction model is better/reduced model better
 #reject null -- low p-val, model with interaction is significant.
 #interaction improves model fit
+#baseline as covariate
 ```
 
 The interaction between time and group is significant. This indicates that the change in SFDs over time differs by group. Since the coefficients are positive (for interaction terms), we can conclude that the intervention group experienced greater improvement over time compared to the control group. Meaning, we see an increase in SFDs over time compared to the control group. 
@@ -218,6 +219,45 @@ Meaning, those in the intervention group experienced much greater improvement in
 g1:t3: For those in the intervention group, the odds of SFDs at 12 months increases by 4.06 (1.87*2.17) compared to baselines.
 Meaning, similar to above. Significant improvement of SFDs over time.
 
+```{r}
+#plotting SFD distribution:
+#overall
+data %>%
+  ggplot(aes(x = SFD)) + 
+  geom_histogram()
+
+#at time 2:
+data %>%
+  filter(time == 2) %>%
+  ggplot(aes(x = SFD)) + 
+  geom_histogram()
+
+#at time 3:
+data %>%
+  filter(time == 3) %>%
+  ggplot(aes(x = SFD)) + 
+  geom_histogram()
+
+#this can go well in EDA to show zero-inflation
+```
+
+
+```{r}
+#diagnostic checking for mod above:
+library(DHARMa)
+
+#residual plots
+plot(simulateResiduals(fittedModel = mod1, n = 1000))
+
+#overdispersion:
+testDispersion(simulateResiduals(fittedModel = mod1, n = 1000))
+
+#zero-inflation:
+testZeroInflation(simulateResiduals(fittedModel = mod1, n = 1000))
+```
+
+
+***effect size, treatment effect***
 
 ```{r, other option}
 library(glmmTMB) #supports zero-inflation, dispersion models
@@ -238,4 +278,41 @@ summary(mod2_noint)
 anova(mod2_noint, mod2)
 ```
 
+
+```{r, binomial zero inflation mod}
+mod3 <- glmmTMB(cbind(SFD, 14-SFD) ~ group*time + (1 | ID/school),
+                zi = ~1,
+                data = data,
+                family = 'binomial')
+
+summary(mod3)
+#AIC = 1302.5 (best)
+#time2, time3 significant
+#Zero-Inflated Beta Binomial
+```
+
+```{r}
+#baseline data only:
+baseline_data <- data %>%
+  filter(time == 1) %>%
+  select(ID, baseline = SFD)
+
+#6,12 month data only:
+fu_data <- data %>%
+  filter(time == 2 | time == 3)
+
+bbz_data <- fu_data %>%
+  left_join(baseline_data, by = 'ID')
+  
+  
+#this models handles overdispersion + zero-inflation.
+
+mod4 <- glmmTMB(cbind(SFD, 14-SFD) ~ baseline + group*time + (1 | ID/school),
+                zi = ~1,
+                data = bbz_data,
+                family = 'betabinomial')
+
+summary(mod4)
+#AIC = 708.4
+```
 
