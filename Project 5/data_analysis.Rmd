@@ -145,7 +145,6 @@ data %>% group_by(time, group) %>%
   xlab('Follow-Up Times') + 
   ylab('# of symptom free days') + 
   theme_classic()
-
 ```
 
 ```{r, avg SFD over time per group}
@@ -157,13 +156,20 @@ sfd_data <- data %>%
             se_sfd = sd_sfd/sqrt(n)) %>%
   ungroup()
 
-ggplot(aes(x = time, y = avg_sfd, col = group, group = group), data = sfd_data) +
+sfd_data %>%
+  mutate(group = case_when(
+      group == 0 ~ 'Control',
+      group == 1 ~ 'Intervention')) %>%
+ggplot(aes(x = time, y = avg_sfd, col = group, group = group)) +
   geom_point() + 
   geom_line() +
   xlab('Follow-up Times') + 
   ylab('Average Number of SFDs (out of 14)') + 
+  scale_x_discrete(labels = c('1' = 'Baseline',
+                              '2' = '6 months FU',
+                              '3' = '12 months FU')) +
   theme_classic() +
-  scale_color_brewer(palette="Set1")
+  scale_color_brewer(palette="Set1") #used this. 
 ```
 
 
@@ -219,7 +225,7 @@ Meaning, those in the intervention group experienced much greater improvement in
 g1:t3: For those in the intervention group, the odds of SFDs at 12 months increases by 4.06 (1.87*2.17) compared to baselines.
 Meaning, similar to above. Significant improvement of SFDs over time.
 
-```{r}
+```{r, SFD distribution plots}
 #plotting SFD distribution:
 #overall
 data %>%
@@ -230,15 +236,28 @@ data %>%
 data %>%
   filter(time == 2) %>%
   ggplot(aes(x = SFD)) + 
-  geom_histogram()
+  geom_histogram() +
+  theme_classic()
 
 #at time 3:
 data %>%
   filter(time == 3) %>%
   ggplot(aes(x = SFD)) + 
-  geom_histogram()
+  geom_histogram() +
+  theme_classic()
 
 #this can go well in EDA to show zero-inflation
+
+bbz_data %>%
+  mutate(time = case_when(
+    time == 2 ~ '6 months follow-up',
+    time == 3 ~ '12 months follow-up')) %>%
+  ggplot(aes(x = SFD)) +
+  geom_histogram(fill = 'darkblue') +
+  facet_grid(cols = vars(time)) +
+  theme_linedraw() #this plot for SFD distrib
+  
+#  facet_grid(time ~ .)
 ```
 
 
@@ -291,7 +310,7 @@ summary(mod3)
 #Zero-Inflated Beta Binomial
 ```
 
-```{r}
+```{r, final mod + ANOVA}
 #baseline data only:
 baseline_data <- data %>%
   filter(time == 1) %>%
@@ -314,5 +333,45 @@ mod4 <- glmmTMB(cbind(SFD, 14-SFD) ~ baseline + group*time + (1 | ID/school),
 
 summary(mod4)
 #AIC = 708.4
+
+
+mod4_noint <- glmmTMB(cbind(SFD, 14-SFD) ~ baseline + group + time + (1 | ID/school),
+                zi = ~1,
+                data = bbz_data,
+                family = 'betabinomial')
+
+summary(mod4_noint)
+
+anova(mod4_noint, mod4)
+#fail to reject null, reduced model is better?
 ```
 
+Output Interpretation:
+
+High dispersion in the model, parameter = 6.25
+
+Very significant p-value, which supports the inclusion of zero-inflation in the model
+The negative intercept means, the probability of an observation being an 'exta zero' is low, but non-neglible. 
+
+
+***Important Conclusion***
+Although we see in one of the first few plots that numerically, on average, the intervention group has higher symptom-free days over time, the Beta-Binomial model with zero-inflation indicates that the effect may not be significant.
+
+
+Significant Coefficient Interpretation:
+The odds of SFDs for the control group at 6 months follow-up and baseline score of 0 are 6.55.
+
+Although this is borderline significant, we see that 1-unit increase in baseline SFDs is associated with 6% higher odds of SFDs at follow-up. 
+Better:
+With each additional SFD at baseline, it is associated with a 6% increase in odds of experiencing a SFD at follow-up (OR = 1.06). This is borderline significant (p = 0.06).
+
+
+Effect Size: Treatment Effect:
+
+The group1 coefficient represents the difference in log-odds of SFDs between the intervention and control group, holding all others constant and after adjusting for baseline SFDs.
+
+At 6-month FU, after adjusting for baseline SFDs, the intervention group had approx 5% lower odds/slightly lower odds (0.95) of experiencing a SFD compared to the control group, but this difference is not statistically significant (OR = 0.95, p = 0.88). 
+
+There is no evidence of a treatment effect at 6 months. 
+We can see that the treatment effect at 6-month FU is neglible.
+The estimated treatment effect at 6-month FU (0R = 0.95) suggests that there is no meaningful difference in the odds of SFDs between the intervention and control groups
