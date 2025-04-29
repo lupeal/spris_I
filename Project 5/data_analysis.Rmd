@@ -11,10 +11,38 @@ library(tidyverse)
 library(readxl)
 ```
 
-#
+# Analysis of Asthma-PASS Intervention 
 
 ```{r}
 #loading data
 data <- read_xlsx("Project 5/Proj 5 data.xlsx")
 ```
+
+## Background:
+
+Within inner city areas, like the Bronx, New York, asthma disproportionately affects low-income African-American and Hispanic children. To help manage asthma, physical activity plays an important role in children. It has been found to be associated with decreased severity in symptoms, reduced school absenteeism, and improved quality of life. Unfortunately, urban minority children with asthma often face barriers to physical activity on a personal, family, school, health care system, and community levels. Ideally, schools could optimize asthma management and promote physical activity. However, often times, they do not faciliate appropriate asthma management and related exercise and may even discourage it. Consequently, there is a need for comprehensive school-based interventions (in collaboration with communities) to help reduce asthma morbidity and promote physical activity in urban minority children with persistent asthma.
+
+Therefore, investigators proposed an intervention program in collaboration with primary care physicians (PCPs) to promote availability of guidline-based preventive medications and rescue medication at schools. The community health workers (CHW) will deliver education to children, caregivers, and school personnel encouraging physical activity. 
+
+A pilot cluster-RCT, where the unit of randomization is school and not students, of Asthma-PASS in four Bronx elementary schools was conducted. A total of 108 asthmatic children were recruited.  
+
+
+
+## Objective 1:
+
+Investigators are interested in whether children in schools receiving Asthma-PASS intervention may experience a greater improvement in number of SFD (Symptom Free Days) at 6 or 12 months follow up compared to children in the AM comparison group.
+
+
+
+## Exploratory Data Analysis:
+
+Asthmatic children were recruited from four Bronx elementary schools among 104 Bronx elementary schools that expressed interested in the study. For students in Bronx and other NYC schools, between 89%-99% were eligible for free lunch (a marker of poverty), 48%-52% were male, and 62%-78% were Hispanics and 20-38% were African Americans. 
+
+A total of 108 children between the ages of 4-11 with physician-diagnosed persistent or uncontrolled asthma attending kindergarten to 5th grade (from the 4 schools selected) were recruited. The four elementary schools were randomly assigned to Asthma-Pass intervention group (2 schools) or AM comparison group (2 schools), where participants followed the routine provided by each school (the standard care). The particpants were followed at 6 and 12 months post baseline. 
+
+```{r}
+
+```
+
+
 
