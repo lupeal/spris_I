@@ -335,7 +335,7 @@ bbz_data %>%
   
 #this models handles overdispersion + zero-inflation.
 
-mod4 <- glmmTMB(cbind(SFD, 14-SFD) ~ baseline + group*time + (1 | ID/school),
+mod4 <- glmmTMB(cbind(SFD, 14-SFD) ~ baseline + group*time + (1 | school) + (1 | school:ID),
                 zi = ~1,
                 data = bbz_data,
                 family = 'betabinomial')
@@ -386,3 +386,16 @@ At 6-month FU, after adjusting for baseline SFDs, the intervention group had app
 There is no evidence of a treatment effect at 6 months. 
 We can see that the treatment effect at 6-month FU is neglible.
 The estimated treatment effect at 6-month FU (0R = 0.95) suggests that there is no meaningful difference in the odds of SFDs between the intervention and control groups. 
+
+
+An option: keep the time variable at baseline, 6-mo, 12-mo
+
+overdispersion = s^2_obs / s^2_bin , 1 1 /N-1 
+
+
+the treatment effect:
+12 month = group1(actually time3) + interaction of group1*time3
+
+
+5 subjects per school, 30 schools, 150 students total
+each subject 4 times points, 
