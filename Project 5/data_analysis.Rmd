@@ -80,9 +80,11 @@ data %>%
 #0 (10.9), 1(11.6) @ t = 3
 
 #avg SFD per group at each time point:
+#includes SD:
 data %>%
   group_by(group, time) %>%
-  summarise(avg_sfd = mean(SFD, na.rm = TRUE))
+  summarise(avg_sfd = mean(SFD, na.rm = TRUE),
+            sd_sfd = sd(SFD, na.rm = TRUE)) #use for table 1
 
 #overall avg SFD per group
 data %>%
@@ -132,6 +134,7 @@ data %>%
 #group 1; time 1=2, time 2=7, time 3=9
 
 #total of 17 ppl with missing values.
+#10 from interv, 7 from control
 ```
 
 
@@ -322,6 +325,12 @@ fu_data <- data %>%
 
 bbz_data <- fu_data %>%
   left_join(baseline_data, by = 'ID')
+
+
+bbz_data %>%
+  group_by(group) %>%
+  summarise(avg_baseline = mean(baseline, na.rm = TRUE),
+            sd_baseline = sd(baseline, na.rm = TRUE))
   
   
 #this models handles overdispersion + zero-inflation.
@@ -350,6 +359,7 @@ Output Interpretation:
 
 High dispersion in the model, parameter = 6.25
 
+Zero-Inflation:
 Very significant p-value, which supports the inclusion of zero-inflation in the model
 The negative intercept means, the probability of an observation being an 'exta zero' is low, but non-neglible. 
 
@@ -359,6 +369,7 @@ Although we see in one of the first few plots that numerically, on average, the 
 
 
 Significant Coefficient Interpretation:
+Intercept:
 The odds of SFDs for the control group at 6 months follow-up and baseline score of 0 are 6.55.
 
 Although this is borderline significant, we see that 1-unit increase in baseline SFDs is associated with 6% higher odds of SFDs at follow-up. 
@@ -374,4 +385,4 @@ At 6-month FU, after adjusting for baseline SFDs, the intervention group had app
 
 There is no evidence of a treatment effect at 6 months. 
 We can see that the treatment effect at 6-month FU is neglible.
-The estimated treatment effect at 6-month FU (0R = 0.95) suggests that there is no meaningful difference in the odds of SFDs between the intervention and control groups
+The estimated treatment effect at 6-month FU (0R = 0.95) suggests that there is no meaningful difference in the odds of SFDs between the intervention and control groups. 
